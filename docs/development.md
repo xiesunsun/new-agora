@@ -26,6 +26,12 @@ pnpm check
 
 本仓库源码保持严格类型检查。`skipLibCheck` 跳过依赖声明文件的检查，兼容桌面 MCP SDK 声明中省略扩展名的导入。
 
+## 在 Codex app 中开发
+
+从仓库根目录打开 Agora 项目。选择共享的 `Agora` 本地环境后，由 Codex 新建的 worktree 会安装锁定的依赖和无头 Chromium。顶栏的 **启动 A01**、**浏览器冒烟** 和 **全量检查** 调用本页的相同命令。环境初始化要求本机已有 Node.js 和 pnpm。参见 [Codex 本地环境](https://learn.chatgpt.com/docs/environments/local-environment)。
+
+在 Codex 的 **Settings > Hooks** 审阅并信任 Agora 的 `SessionStart` hook。新聊天启动时，hook 读取 worktree、分支和已有改动状态，并提示开工前记录基线。基线仍由开发者确认和保存。参见 [Codex Hooks](https://learn.chatgpt.com/docs/hooks)。
+
 ## 固定开发基线
 
 开工前记录已接受的基线提交。工作树已有未提交改动时，在仓库根目录保存清单，完成后对照清单审查本轮增量。

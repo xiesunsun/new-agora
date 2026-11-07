@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^startup$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/codex-session-start.py\"",
+            "statusMessage": "核对 Agora 工作树",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
