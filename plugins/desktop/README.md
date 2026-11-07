@@ -1,13 +1,23 @@
 # Codex 桌面接入
 
-参考实现 `next/plugins/desktop/` 负责当前对话的面板与 MCP 接入。业务状态写入[本地服务](../../apps/service/README.md)，面板使用同一套[界面逻辑](../../apps/panel/README.md)。
+## 安装测试构建
 
-| 文件 | 职责 |
-| --- | --- |
-| `src/server.ts`、`src/panel.ts` | MCP 工具、面板和公开回调 |
-| `src/adapter.ts`、`src/gateway.ts` | 归属检查、服务访问与执行请求 |
-| `src/runtime.ts` | 匹配服务、独立包启动与运行环境 |
+在仓库根目录运行 `pnpm build`。桌面插件在 `dist/desktop`。用测试 Markdown 副本和独立运行目录启动真实服务。
 
-面板发送自然唤醒后，以实际领取判断任务是否开始。发送前校验当前对话；公开 active 消息接口在切换对话时存在校验与发送之间的竞态。执行入口还会核对绑定与执行上下文。缺失或外来上下文的调用被拒绝。宿主标识的用途是本地接入归属校验。
+```sh
+scratch=$(mktemp -d)
+cp tests/fixtures/a01/original.md "$scratch/manuscript.md"
+pnpm start --file "$scratch/manuscript.md" --runtime "$scratch/runtime"
+```
 
-安装验证使用参考实现 `next/README.md` 的桌面插件步骤。先确认插件构建、当前对话、临时绑定文件和隔离运行目录，再走 [A01](../../tests/README.md#a01)、[A03](../../tests/README.md#a03)和 [A09](../../tests/README.md#a09)。受控 MCP 和实际宿主分开记录。已知构建结果见[历史证据](../../evidence/README.md)。
+将插件构建复制到本地测试市场，在副本的 `.mcp.json` 中设置 `mcpServers.agora-a01.env.AGORA_CONNECTION`，值为上一步打印的运行目录下 `connection.json` 的绝对路径。运行目录保留在插件目录外。按 [Codex 本地市场安装步骤](https://developers.openai.com/plugins/build/plugins#build-your-own-curated-plugin-list) 在桌面应用安装测试构建。在测试对话请 Codex 调用 `agora_open_document` 打开文稿。
+
+## 改稿与提交
+
+从当前 Codex 对话打开并绑定 Markdown。用户点 **生成修改建议** 后，桌面插件通知该对话领取任务。通知受理后继续显示等待，直到本地服务核对绑定和对话并确认领取。
+
+`agora_claim_next` 返回待审 Markdown 路径、批注选区和用户意见。Codex 用原生工具修改待审稿，再用同一个执行编号调用 `agora_submit_candidate`。Agora 读取待审文件并算出差异。来自其他对话的领取或提交应被拒绝。
+
+给出待审路径并说明用途只能约束正常操作。如果 Codex 仍能写原文件，副本本身不提供权限隔离。要承诺强制限制原路径写入，必须用工具或运行环境验证该限制。
+
+用测试文件在真实 Codex 桌面版验证当前对话能领取并编辑待审稿，切到另一对话不能领取，审阅前原文件内容保持原样。参见[完整闭环](../../tests/README.md#a01)和[对话归属](../../tests/README.md#a03)。

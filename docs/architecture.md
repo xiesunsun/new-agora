@@ -1,28 +1,24 @@
-# 架构与状态归属
+# 代码分工
 
-下图描述参考实现。目录名对应新仓库的文档落点，源码仍在[旧仓库的 `next/`](archive/README.md)。
+面板收集用户的批注和审阅选择。本地服务保存本轮底稿、Codex 交回的待审稿和历史版本。桌面插件把生成任务交给当前 Codex 对话。Codex 写待审文件，用户点应用后由本地服务写回原文件。
 
 ```mermaid
 flowchart LR
-    Panel[浏览器或插件面板] -->|查询与命令| Service[本地服务]
-    Panel -->|唤醒当前对话| Host[Codex 宿主]
-    Host -->|MCP| Adapter[桌面适配器]
-    Adapter --> Service
-    CLI[本地 worker CLI] --> Service
-    Service --> DB[(SQLite)]
-    Service --> Bridge[本地文件桥]
-    Bridge --> File[绑定的 Markdown]
-    Host -->|原生编辑工具| File
+    Panel[面板] -->|开始改稿或应用| Service[本地服务]
+    Service -->|交给当前对话| Plugin[桌面插件]
+    Plugin --> Host[Codex]
+    Host --> Candidate[待审 Markdown]
+    Candidate -->|提交后读取并比较底稿| Service
+    Service -->|差异与应用结果| Panel
+    Service -->|用户应用后写入并读回| File[原 Markdown]
+    Service --> Versions[历史版本]
 ```
 
-| 模块 | 职责和入口 |
+| 问题 | 负责的部分 |
 | --- | --- |
-| 面板 | 持有草稿和待核对请求，显示服务投影。[面板参考](../apps/panel/README.md) |
-| 本地服务 | 裁决动作、审阅、队列、正式版本和同步计划。SQLite 持久化业务事实。[服务参考](../apps/service/README.md) |
-| 本地 worker | 提供可控执行入口，用原上下文领取、捕获和恢复工作。[worker 参考](../apps/worker/README.md) |
-| 桌面适配器 | 将当前对话的工具调用接入同一服务。[宿主参考](../plugins/desktop/README.md) |
-| 共享包 | [运行时契约](../packages/contracts/README.md)校验边界数据，[文本工具](../packages/text/README.md)处理原文和偏移。 |
+| 怎么保存输入、看差异、改变选择？ | [面板](../apps/panel/README.md) |
+| 怎么保存本轮内容、写回原文件、登记版本？ | [本地服务](../apps/service/README.md) |
+| 怎么让当前对话拿到任务并提交待审稿？ | [桌面插件](../plugins/desktop/README.md)和[本地执行工具](../apps/worker/README.md) |
+| 怎么传数据和计算差异？ | [接口约定](../packages/contracts/README.md)和[文本工具](../packages/text/README.md) |
 
-工作正文、正式版本及已核对的文件检查点由服务记录。原文件是实际文件内容的来源。面板保存本机草稿，Codex 宿主持有自己的消息与轮次状态。消息被宿主接收、任务被领取、文件被核对是不同的事实。
-
-服务的领域和应用层通过端口连接 SQLite 和文件操作。HTTP、MCP、CLI 都进入服务用例。面板依赖共享契约和文本工具，服务负责裁决业务状态。
+本轮底稿可能包含还未写到磁盘的人类编辑。生成差异时用底稿比较，应用后读回原文件核对写入结果。实际领到任务后才显示正在改稿。
