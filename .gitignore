@@ -1,0 +1,10 @@
+/.codex/*
+!/.codex/hooks.json
+!/.codex/environments/
+/.codex/environments/*
+!/.codex/environments/environment.toml
+/.agents/
+
+node_modules/
+dist/
+coverage/

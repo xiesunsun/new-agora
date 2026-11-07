@@ -1,0 +1,39 @@
+{
+  "name": "agora",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": "^22.13.0"
+  },
+  "scripts": {
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:architecture && pnpm test && pnpm check:docs",
+    "format:check": "prettier --check .",
+    "lint": "oxlint --import-plugin --disable-nested-config --deny-warnings --report-unused-disable-directives-severity=error --ignore-path .gitignore",
+    "typecheck": "tsc --project tsconfig.json",
+    "check:architecture": "depcruise --config .dependency-cruiser.mjs apps packages plugins",
+    "test": "node --test tests/tooling/*.test.mjs",
+    "check:docs": "python3 scripts/check-doc-links.py"
+  },
+  "devDependencies": {
+    "@types/diff": "7.0.2",
+    "@types/node": "22.20.5",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "dependency-cruiser": "18.7.2",
+    "esbuild": "0.25.12",
+    "oxlint": "1.92.0",
+    "playwright": "1.65.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@openai/mcp-extensions": "0.1.0",
+    "diff": "7.0.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.4.3"
+  }
+}
