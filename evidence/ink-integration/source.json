@@ -1,0 +1,24 @@
+{
+  "acceptedRepositoryCommit": "78cafaf1cf6c7f52b77939b07d9a01381a3bd7c2",
+  "prototype": "ink-prototype-v1",
+  "matchingWorkCopy": "review-readback-20261109/work",
+  "topLevelFiles": {
+    "README.md": "637046f8fde45e034ca8ab50af29f1f0abae6e564e17a9270db9b5b284c05923",
+    "app.js": "dcba72195d0c7f88fa388d3fac1e1b1bf07fbc00748d6c54fa1a715833c769c3",
+    "continuity.css": "0dedf6772b6c0b92c0fbe00c5f896510035aefc78e1771c13c29aa029f3a444d",
+    "history-ruler.js": "a655a85db0d397625da06ce72e3607ef5c8bb32b0615771f95c9a3903845b9a8",
+    "history.css": "9a9a1a8d1954621e2d6f1d202a0a14741f9e6741c26778ce9b31d658acb5afa6",
+    "index.html": "cf8d7853243fc3ebafa3ee6911f204aeb11ac0fd9c1d49263ec30f2cb718ac97",
+    "ink.css": "baf90c06bf0a030fb7a636e66c10be2cd7b23f4c5d72954c83025fd8f2ac4f6b",
+    "notebook.js": "74d01bc89bbab52b4bc14d49ca1379112054d61d814e456fe6ab63d9b3859c74",
+    "orbit-layout.js": "5cb2ea830187df5d5acb937bfccde5bea2419f5962a49d34ffc9086bb6442eb5",
+    "review-document.js": "12d021c315eb79fbcf59af4832b0707eb358b3fd2ddaefac98a2fe0825b040bb",
+    "review-runs.js": "16f7ae8d3713aee22887d3a9555e11d45c998f5ddf30807a713c0073cb292a0b",
+    "text.js": "6a4ef098372b54b4b2ba18216620b01c31239a781c72ee82c67b635f5fbd3c5c"
+  },
+  "archiveFileCount": 378,
+  "archiveSha256": "229ec37384ec345f32fec273b005ef7c629bdbba469fec030d4b1c011b23a13b",
+  "cleanupAllowlist": ["ink-prototype-v1", "review-readback-20261109"],
+  "cleanupStatus": "removed-after-verifying-current-source-against-archive",
+  "archivePath": "/Users/ssunxie/.local/state/agora/archive/ink-integration-20261109/accepted-explorations.tar.gz"
+}

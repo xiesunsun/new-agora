@@ -16,7 +16,7 @@ pnpm start --file "$scratch/manuscript.md" --runtime "$scratch/runtime"
 
 从当前 Codex 对话打开并绑定 Markdown。用户点 **生成修改建议** 后，桌面插件通知该对话领取任务。通知受理后继续显示等待，直到本地服务核对绑定和对话并确认领取。
 
-`agora_claim_next` 返回待审 Markdown 路径、批注选区和用户意见。Codex 用原生工具修改待审稿，再用同一个执行编号调用 `agora_submit_candidate`。Agora 读取待审文件并算出差异。来自其他对话的领取或提交应被拒绝。
+`agora_claim_next` 返回待审 Markdown 路径、批注选区和用户意见。Codex 用原生工具修改待审稿，再用同一个执行编号调用 `agora_submit_candidate`。Agora 读取待审文件并算出差异。来自其他对话的领取或提交应被拒绝。领取后失败或取消，使用同一个执行编号调用 `agora_finish_execution` 报告 failed 或 cancelled。停止后迟到提交只提供结束证据，不能发布旧建议。执行结束未知时，重试与全新生成都保持阻止。
 
 给出待审路径并说明用途只能约束正常操作。如果 Codex 仍能写原文件，副本本身不提供权限隔离。要承诺强制限制原路径写入，必须用工具或运行环境验证该限制。
 

@@ -1,0 +1,482 @@
+
+> agora@ check /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:architecture && pnpm test && pnpm check:docs
+
+
+> agora@ format:check /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> agora@ lint /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> oxlint --import-plugin --disable-nested-config --deny-warnings --report-unused-disable-directives-severity=error --ignore-path .gitignore
+
+
+> agora@ typecheck /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> tsc --project tsconfig.json
+
+
+> agora@ check:architecture /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> depcruise --config .dependency-cruiser.mjs apps packages plugins dev
+
+
+✔ no dependency violations found (41 modules, 74 dependencies cruised)
+
+
+> agora@ test /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> pnpm build && node --test tests/*.test.mjs tests/tooling/*.test.mjs tests/browser/*.test.mjs
+
+
+> agora@ build /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> node scripts/build.mjs
+
+TAP version 13
+# Subtest: A01 keeps a selected suggestion and the human title in the file and V2
+ok 1 - A01 keeps a selected suggestion and the human title in the file and V2
+  ---
+  duration_ms: 469.645958
+  type: 'test'
+  ...
+# Subtest: an interrupted apply stays pending and restart reconciles the original operation
+ok 2 - an interrupted apply stays pending and restart reconciles the original operation
+  ---
+  duration_ms: 297.691708
+  type: 'test'
+  ...
+# Subtest: Ink preserves note IME, geometry, settled readback, save and history through the built service
+ok 3 - Ink preserves note IME, geometry, settled readback, save and history through the built service
+  ---
+  duration_ms: 4113.139292
+  type: 'test'
+  ...
+# Subtest: unsupported Markdown edits retain BOM, CRLF and literal markup across autosave and apply
+ok 4 - unsupported Markdown edits retain BOM, CRLF and literal markup across autosave and apply
+  ---
+  duration_ms: 1032.626208
+  type: 'test'
+  ...
+# Subtest: grouped comments remain individually reachable and composer cancellation restores its source
+ok 5 - grouped comments remain individually reachable and composer cancellation restores its source
+  ---
+  duration_ms: 1666.143334
+  type: 'test'
+  ...
+# Subtest: discarding every suggestion ends review directly and preserves human edits and notes
+ok 6 - discarding every suggestion ends review directly and preserves human edits and notes
+  ---
+  duration_ms: 1462.244292
+  type: 'test'
+  ...
+# Subtest: editing after an ended cancellation starts a fresh generation from the edited draft
+ok 7 - editing after an ended cancellation starts a fresh generation from the edited draft
+  ---
+  duration_ms: 2964.17875
+  type: 'test'
+  ...
+# Subtest: normal-motion choice animates the committed block and reduced motion renders immediately
+ok 8 - normal-motion choice animates the committed block and reduced motion renders immediately
+  ---
+  duration_ms: 1139.778666
+  type: 'test'
+  ...
+# Subtest: exact editor preserves mixed raw separators and BOM through sequential edits, save and reopen
+ok 9 - exact editor preserves mixed raw separators and BOM through sequential edits, save and reopen
+  ---
+  duration_ms: 956.250334
+  type: 'test'
+  ...
+# Subtest: exact editor maps forward UTF-16 selections to raw anchors and restores history and composer focus
+ok 10 - exact editor maps forward UTF-16 selections to raw anchors and restores history and composer focus
+  ---
+  duration_ms: 1206.53125
+  type: 'test'
+  ...
+# Subtest: exact editor maps backward UTF-16 selections to raw anchors and restores history and composer focus
+ok 11 - exact editor maps backward UTF-16 selections to raw anchors and restores history and composer focus
+  ---
+  duration_ms: 1131.062417
+  type: 'test'
+  ...
+# Subtest: all-discarded review saves actual human edits once and keeps comments
+ok 12 - all-discarded review saves actual human edits once and keeps comments
+  ---
+  duration_ms: 1369.518584
+  type: 'test'
+  ...
+# Subtest: all-discarded review of an unedited adopted version offers no save and preserves the newer disk version
+ok 13 - all-discarded review of an unedited adopted version offers no save and preserves the newer disk version
+  ---
+  duration_ms: 1422.088792
+  type: 'test'
+  ...
+# Subtest: desktop wakes each queued generation and retry once and cleans up its mount
+ok 14 - desktop wakes each queued generation and retry once and cleans up its mount
+  ---
+  duration_ms: 466.3555
+  type: 'test'
+  ...
+# (node:60249) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Ink refuses undecided apply, preserves round identity on restart, then saves one receipt
+ok 15 - Ink refuses undecided apply, preserves round identity on restart, then saves one receipt
+  ---
+  duration_ms: 415.011625
+  type: 'test'
+  ...
+# Subtest: cancelled claimed execution blocks every generate until late submit gives terminal evidence
+ok 16 - cancelled claimed execution blocks every generate until late submit gives terminal evidence
+  ---
+  duration_ms: 222.974042
+  type: 'test'
+  ...
+# Subtest: history adoption switches working base without file write or version and rejects stale adoption
+ok 17 - history adoption switches working base without file write or version and rejects stale adoption
+  ---
+  duration_ms: 164.701541
+  type: 'test'
+  ...
+# Subtest: abandon and all-discard save preserve comments, worker failure enables frozen-input retry
+ok 18 - abandon and all-discard save preserve comments, worker failure enables frozen-input retry
+  ---
+  duration_ms: 148.0695
+  type: 'test'
+  ...
+# Subtest: operation recheck never retries a failed write and later explicit save uses a new operation
+ok 19 - operation recheck never retries a failed write and later explicit save uses a new operation
+  ---
+  duration_ms: 224.379333
+  type: 'test'
+  ...
+# Subtest: adoption persistence failure preserves draft, comments and version lineage
+ok 20 - adoption persistence failure preserves draft, comments and version lineage
+  ---
+  duration_ms: 106.547958
+  type: 'test'
+  ...
+# Subtest: legacy persisted review IDs and unknown timestamps survive validated migration
+ok 21 - legacy persisted review IDs and unknown timestamps survive validated migration
+  ---
+  duration_ms: 199.575
+  type: 'test'
+  ...
+# Subtest: history adoption after confirmation can replace a review without writing
+ok 22 - history adoption after confirmation can replace a review without writing
+  ---
+  duration_ms: 127.093708
+  type: 'test'
+  ...
+# Subtest: new and repaired annotations on newly typed text stay resolved
+ok 23 - new and repaired annotations on newly typed text stay resolved
+  ---
+  duration_ms: 104.79675
+  type: 'test'
+  ...
+# Subtest: all-discard review saves human edits and preserves unchanged submitted comments
+ok 24 - all-discard review saves human edits and preserves unchanged submitted comments
+  ---
+  duration_ms: 107.605958
+  type: 'test'
+  ...
+# Subtest: restart preserves unknown execution gate and only its own terminal report unlocks it
+ok 25 - restart preserves unknown execution gate and only its own terminal report unlocks it
+  ---
+  duration_ms: 220.281834
+  type: 'test'
+  ...
+# Subtest: an unresolved claimed execution cannot disappear through abandon or history adoption
+ok 26 - an unresolved claimed execution cannot disappear through abandon or history adoption
+  ---
+  duration_ms: 120.292
+  type: 'test'
+  ...
+# Subtest: real review and write retain exact Unicode and Markdown bytes "﻿\# 稿件\\r\\n\\r"
+ok 27 - real review and write retain exact Unicode and Markdown bytes "﻿\# 稿件\\r\\n\\r"
+  ---
+  duration_ms: 111.388708
+  type: 'test'
+  ...
+# Subtest: real review and write retain exact Unicode and Markdown bytes "\# 稿件\\n\\n| "
+ok 28 - real review and write retain exact Unicode and Markdown bytes "\# 稿件\\n\\n| "
+  ---
+  duration_ms: 106.611625
+  type: 'test'
+  ...
+# Subtest: editing adopted history writes against latest disk checkpoint and records its actual parent
+ok 29 - editing adopted history writes against latest disk checkpoint and records its actual parent
+  ---
+  duration_ms: 132.492708
+  type: 'test'
+  ...
+# Subtest: recheck retains unrelated disk evidence and registers late matching readback only once
+ok 30 - recheck retains unrelated disk evidence and registers late matching readback only once
+  ---
+  duration_ms: 79.251208
+  type: 'test'
+  ...
+# Subtest: discarding all suggestions after history adoption never restores the original or creates a version
+ok 31 - discarding all suggestions after history adoption never restores the original or creates a version
+  ---
+  duration_ms: 140.580084
+  type: 'test'
+  ...
+# Subtest: legacy successful apply receipts recognize exact replay with unknown original revision
+ok 32 - legacy successful apply receipts recognize exact replay with unknown original revision
+  ---
+  duration_ms: 142.0075
+  type: 'test'
+  ...
+# Subtest: legacy annotation focus metadata is normalized before a leftward anchor move and restart
+ok 33 - legacy annotation focus metadata is normalized before a leftward anchor move and restart
+  ---
+  duration_ms: 173.437084
+  type: 'test'
+  ...
+# Subtest: mock can import the public worker and contracts entries
+ok 34 - mock can import the public worker and contracts entries
+  ---
+  duration_ms: 506.259916
+  type: 'test'
+  ...
+# Subtest: mock cannot import private service code
+ok 35 - mock cannot import private service code
+  ---
+  duration_ms: 442.637
+  type: 'test'
+  ...
+# Subtest: production panel cannot import mock configuration
+ok 36 - production panel cannot import mock configuration
+  ---
+  duration_ms: 294.945125
+  type: 'test'
+  ...
+# Subtest: two configured mocks use isolated manuscripts, workers and real save/version behavior
+ok 37 - two configured mocks use isolated manuscripts, workers and real save/version behavior
+  ---
+  duration_ms: 385.778292
+  type: 'test'
+  ...
+# Subtest: configured worker failure reports terminal evidence through the real service
+ok 38 - configured worker failure reports terminal evidence through the real service
+  ---
+  duration_ms: 264.437792
+  type: 'test'
+  ...
+# Subtest: stopping a claimed scripted worker persists a genuine cancelled receipt
+ok 39 - stopping a claimed scripted worker persists a genuine cancelled receipt
+  ---
+  duration_ms: 236.588333
+  type: 'test'
+  ...
+# Subtest: desktop terminal tool reports failed and cancelled claimed executions
+ok 40 - desktop terminal tool reports failed and cancelled claimed executions
+  ---
+  duration_ms: 249.439333
+  type: 'test'
+  ...
+# Subtest: default mock opens the accepted bookstore with its two seeded comments
+ok 41 - default mock opens the accepted bookstore with its two seeded comments
+  ---
+  duration_ms: 116.304167
+  type: 'test'
+  ...
+# Subtest: a failed save preserves composer and prevents generation
+ok 42 - a failed save preserves composer and prevents generation
+  ---
+  duration_ms: 2.275625
+  type: 'test'
+  ...
+# Subtest: queued saves capture immutable inputs and older polls cannot replace typing
+ok 43 - queued saves capture immutable inputs and older polls cannot replace typing
+  ---
+  duration_ms: 6.346334
+  type: 'test'
+  ...
+# Subtest: confirmation is invalid after a later input or canonical revision
+ok 44 - confirmation is invalid after a later input or canonical revision
+  ---
+  duration_ms: 0.174666
+  type: 'test'
+  ...
+# Subtest: a late apply receipt never labels newer input saved
+ok 45 - a late apply receipt never labels newer input saved
+  ---
+  duration_ms: 2.43125
+  type: 'test'
+  ...
+# Subtest: generate uses the canonical saved comment revisions and anchors
+ok 46 - generate uses the canonical saved comment revisions and anchors
+  ---
+  duration_ms: 0.524458
+  type: 'test'
+  ...
+# Subtest: rapid choices serialize canonical revisions and retain the round identity
+ok 47 - rapid choices serialize canonical revisions and retain the round identity
+  ---
+  duration_ms: 2.622459
+  type: 'test'
+  ...
+# Subtest: a canonical revision invalidates an open confirmation
+ok 48 - a canonical revision invalidates an open confirmation
+  ---
+  duration_ms: 0.348167
+  type: 'test'
+  ...
+# Subtest: an unknown apply response refreshes and rechecks the original operation without another write
+ok 49 - an unknown apply response refreshes and rechecks the original operation without another write
+  ---
+  duration_ms: 0.296209
+  type: 'test'
+  ...
+# Subtest: failed discard and deletion preserve the original composer and confirmed comment
+ok 50 - failed discard and deletion preserve the original composer and confirmed comment
+  ---
+  duration_ms: 0.421209
+  type: 'test'
+  ...
+# Subtest: disposing during a save prevents a queued generation from dispatching
+ok 51 - disposing during a save prevents a queued generation from dispatching
+  ---
+  duration_ms: 3.379083
+  type: 'test'
+  ...
+# Subtest: settled inline reading contains each selected sentence once and readback does not mutate choices
+ok 52 - settled inline reading contains each selected sentence once and readback does not mutate choices
+  ---
+  duration_ms: 10.084208
+  type: 'test'
+  ...
+# Subtest: presentation keeps raw block positions and Unicode review runs exact
+ok 53 - presentation keeps raw block positions and Unicode review runs exact
+  ---
+  duration_ms: 0.191334
+  type: 'test'
+  ...
+# Subtest: the ruler wraps through the last version using bounded visual slots
+ok 54 - the ruler wraps through the last version using bounded visual slots
+  ---
+  duration_ms: 0.36025
+  type: 'test'
+  ...
+# Subtest: the orbit uses 44 pixel controls and a pen never returns a colliding placement
+ok 55 - the orbit uses 44 pixel controls and a pen never returns a colliding placement
+  ---
+  duration_ms: 1.63725
+  type: 'test'
+  ...
+# Subtest: textarea mapping retains raw UTF-16 boundaries and unchanged separators across separate edits
+ok 56 - textarea mapping retains raw UTF-16 boundaries and unchanged separators across separate edits
+  ---
+  duration_ms: 4.81475
+  type: 'test'
+  ...
+# Subtest: review choices group whole titles and separate changed sentences
+ok 57 - review choices group whole titles and separate changed sentences
+  ---
+  duration_ms: 15.169792
+  type: 'test'
+  ...
+# Subtest: review units preserve BOM, CRLF, emoji, spaces and paragraph additions
+ok 58 - review units preserve BOM, CRLF, emoji, spaces and paragraph additions
+  ---
+  duration_ms: 0.589583
+  type: 'test'
+  ...
+# Subtest: review exact reconstruction includes deletion, empty and whitespace changes
+ok 59 - review exact reconstruction includes deletion, empty and whitespace changes
+  ---
+  duration_ms: 0.499125
+  type: 'test'
+  ...
+# Subtest: comment anchors shift by UTF16 and refuse changed or ambiguous quotes
+ok 60 - comment anchors shift by UTF16 and refuse changed or ambiguous quotes
+  ---
+  duration_ms: 0.285166
+  type: 'test'
+  ...
+# Subtest: budget exhaustion returns an exact bounded whole-document choice
+ok 61 - budget exhaustion returns an exact bounded whole-document choice
+  ---
+  duration_ms: 0.422958
+  type: 'test'
+  ...
+# Subtest: paragraph choices preserve independently kept changes and inserted blocks
+ok 62 - paragraph choices preserve independently kept changes and inserted blocks
+  ---
+  duration_ms: 1.151834
+  type: 'test'
+  ...
+# Subtest: reanchoring repairs invalid legacy focus before moving an anchor left
+ok 63 - reanchoring repairs invalid legacy focus before moving an anchor left
+  ---
+  duration_ms: 0.379958
+  type: 'test'
+  ...
+# Subtest: allows private files within an owner and public imports across owners
+ok 64 - allows private files within an owner and public imports across owners
+  ---
+  duration_ms: 537.11225
+  type: 'test'
+  ...
+# Subtest: resolves workspace packages through their public exports
+ok 65 - resolves workspace packages through their public exports
+  ---
+  duration_ms: 336.678625
+  type: 'test'
+  ...
+# Subtest: rejects a panel re-export of service code
+ok 66 - rejects a panel re-export of service code
+  ---
+  duration_ms: 277.524625
+  type: 'test'
+  ...
+# Subtest: rejects a type-only import into a shared package's private file
+ok 67 - rejects a type-only import into a shared package's private file
+  ---
+  duration_ms: 272.682958
+  type: 'test'
+  ...
+# Subtest: rejects a bridge through repository tooling
+ok 68 - rejects a bridge through repository tooling
+  ---
+  duration_ms: 267.80525
+  type: 'test'
+  ...
+# Subtest: rejects a type-only cycle within an owner
+ok 69 - rejects a type-only cycle within an owner
+  ---
+  duration_ms: 268.452583
+  type: 'test'
+  ...
+# Subtest: rejects Node built-ins in browser-safe code
+ok 70 - rejects Node built-ins in browser-safe code
+  ---
+  duration_ms: 270.405625
+  type: 'test'
+  ...
+# Subtest: rejects unresolved imports
+ok 71 - rejects unresolved imports
+  ---
+  duration_ms: 265.8495
+  type: 'test'
+  ...
+# Subtest: an external baseline compares tracked and untracked files without staging
+ok 72 - an external baseline compares tracked and untracked files without staging
+  ---
+  duration_ms: 550.57025
+  type: 'test'
+  ...
+1..72
+# tests 72
+# suites 0
+# pass 72
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 18762.178834
+
+> agora@ check:docs /Users/ssunxie/.codex/worktrees/ink-integration/new_agora
+> python3 scripts/check-doc-links.py
+
+Checked 28 Markdown files and 103 local links.

@@ -24,6 +24,8 @@ pnpm check
 
 运行 `pnpm dev` 打开 [A01 测试文稿](../tests/README.md#a01)。命令会构建实际面板和服务，并打印预览地址、Markdown 副本和运行目录。要单独构建发布入口，运行 `pnpm build`。
 
+运行 `pnpm mock` 打开已确认的墨间书店示例。运行 `pnpm mock --config /absolute/path/scenario.json` 更换初始文稿、批注、生成结果与延迟。每次使用隔离的测试副本，配置和模拟执行不进入面板。[mock 场景说明](../dev/mock/README.md)给出字段与真实服务入口。
+
 本仓库源码保持严格类型检查。`skipLibCheck` 跳过依赖声明文件的检查，兼容桌面 MCP SDK 声明中省略扩展名的导入。
 
 ## 在 Codex app 中开发
