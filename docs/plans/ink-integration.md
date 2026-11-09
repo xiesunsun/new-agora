@@ -1,5 +1,7 @@
 # Ink 正式接入实施计划
 
+状态为已交付接入实现。实际 Codex 宿主 A01、A03 尚未验收，见文末。以下基线、目录和流程记录本次接入，不代替现行[仓库约束](../repository-workflow.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** 将已确认的墨间界面接入真实服务，使 mock 场景可独立维护，并清理被替换的实现。

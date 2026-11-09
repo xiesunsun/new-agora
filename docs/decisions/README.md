@@ -23,3 +23,7 @@ Codex 用原生工具改待审 Markdown。Agora 读回结果，和本轮底稿�
 ## Ink 接入
 
 [Ink 界面与 mock 的接入边界](ink-integration.md)记录正式服务、界面与开发场景的分工。
+
+## 仓库约束
+
+[仓库约束的归属与执行](repository-governance.md)记录从 DeepSeek Harness 借鉴的机制，以及 Agora 自己的分支、worktree 和命名约定。

@@ -1,5 +1,7 @@
 # 开发与审阅
 
+开始任务时先按[仓库与命名约束](repository-workflow.md)记录执行目录、基线和交付分支。文档分工见[文档归属规则](AGENTS.md)。
+
 ## 运行检查
 
 准备 Node.js 22.13 或更新的 22.x 版本、pnpm 9.15.0、Python 3.9 或更新版本，以及 Git。在仓库根目录安装依赖并运行检查。
@@ -30,7 +32,7 @@ pnpm check
 
 ## 在 Codex app 中开发
 
-从仓库根目录打开 Agora 项目。选择共享的 `Agora` 本地环境后，由 Codex 新建的 worktree 会安装锁定的依赖和无头 Chromium。顶栏的 **启动 A01**、**浏览器冒烟** 和 **全量检查** 调用本页的相同命令。环境初始化要求本机已有 Node.js 和 pnpm。参见 [Codex 本地环境](https://learn.chatgpt.com/docs/environments/local-environment)。
+从用户指定的主项目目录打开 Agora。普通任务沿用该目录，需要隔离时按 [worktree 规则](repository-workflow.md#主目录与-worktree)记录用途和回收条件。选择共享的 `Agora` 本地环境后，由 Codex 新建的 worktree 会安装锁定的依赖和无头 Chromium。顶栏的 **启动 A01**、**浏览器冒烟** 和 **全量检查** 调用本页的相同命令。环境初始化要求本机已有 Node.js 和 pnpm。参见 [Codex 本地环境](https://learn.chatgpt.com/docs/environments/local-environment)。
 
 在 Codex 的 **Settings > Hooks** 审阅并信任 Agora 的 `SessionStart` hook。新聊天启动时，hook 读取 worktree、分支和已有改动状态，并提示开工前记录基线。基线仍由开发者确认和保存。参见 [Codex Hooks](https://learn.chatgpt.com/docs/hooks)。
 
