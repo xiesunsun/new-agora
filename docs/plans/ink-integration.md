@@ -100,7 +100,7 @@
 - [x] 运行 no-comments 审阅，再做独立规格和代码质量审阅。修复后重新验证相关路径。
 - [x] 运行 `pnpm check`。以同一构建记录桌面和窄窗截图、入口、构建摘要和写回副本。
 - [x] 核对归档内容与 SHA-256 清单后，仅清理明确被替代的探索目录。保留其他未判定目录。
-- [ ] 运行 `python3 scripts/check-doc-links.py`。按已验证单元整理提交，创建可审阅 PR。
+- [x] 运行 `python3 scripts/check-doc-links.py`。按已验证单元整理提交，创建可审阅 PR。
 
 ## 审阅边界
 

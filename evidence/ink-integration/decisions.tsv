@@ -13,3 +13,4 @@ ts	phase	decision	why	evidence	result
 2026-11-09T03:25:48Z	verification	主代理运行冻结代码的全量检查并核对同构建原生操作	以实际构建、服务副本和读回结果作为交付证据	evidence/ink-integration/check.log	72 项测试通过，无跳过；原生 V2 和混合换行核对通过
 2026-11-09T03:25:48Z	cleanup	重新核对 378 个源摘要后删除明确的两个探索目录	在正式接入验证后去掉对应重复实现，并保留可恢复来源	evidence/ink-integration/source.json	两个目录已清理，其他设计目录保留；早期原型 README 证据迁入归档
 2026-11-09T03:27:32Z	commit	提交已审阅和验证的正式接入代码	将统一界面、服务契约与独立 mock 作为完整调用交付	fdb0b0a	应用代码已提交；文档证据单独整理
+2026-11-09T03:29:10Z	forge	连接器权限不足后使用已登录 gh 创建可审阅 PR	完成已授权的分支交付，不因连接器 403 停止必要工作	https://github.com/xiesunsun/new-agora/pull/1	PR #1 OPEN，非草稿，main 为目标；未合并
