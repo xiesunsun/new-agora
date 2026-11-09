@@ -1,6 +1,6 @@
 # 开发收尾与资源验收
 
-本轮从 `dc0e595a69e558f062a7246b93a8023b5d2c8be2` 继续，实际执行目录为 `/Users/ssunxie/code/new_agora`，沿用 `codex/docs-repository-governance` 修正 [PR #2](https://github.com/xiesunsun/new-agora/pull/2)。2026-11-09 的本地全量检查通过，117 个测试无失败或跳过。远端 CI 以 PR 当前提交的 Checks 为准。
+本轮从 `dc0e595a69e558f062a7246b93a8023b5d2c8be2` 继续，实际执行目录为 `/Users/ssunxie/code/new_agora`，沿用 `codex/docs-repository-governance` 修正 [PR #2](https://github.com/xiesunsun/new-agora/pull/2)。2026-11-09 的本地全量检查通过，118 个测试无失败或跳过。远端 CI 以 PR 当前提交的 Checks 为准。
 
 ## 事实与保留位置
 
@@ -17,9 +17,11 @@
 
 ## 本地验收结果
 
-`AGORA_TASK_ID=2026-11-09-development-lifecycle pnpm check` 通过仓库归属、格式、lint、类型、依赖边界、构建、117 个测试及文档链接检查。`pnpm clean:dev` 列出的默认受管运行为空。完整日志为任务目录中的 `check.log`。
+`AGORA_TASK_ID=2026-11-09-development-lifecycle pnpm check` 通过仓库归属、格式、lint、类型、依赖边界、构建、118 个测试及文档链接检查。`pnpm clean:dev` 列出的默认受管运行为空。完整日志为任务目录中的 `check.log`。
 
 回归覆盖 mock 启动失败与停止、显式保留和清理、测试污染源码、runner 中断、独立进程组、浏览器中断、PID 启动身份和不确定身份的安全停止。独立审阅发现的基线符号链接写入、运行句柄随环境变化及中断回调问题均已修复并以反例验证。
+
+首轮远端 CI 暴露 Linux 全机快照中合法的进程组 `0` 被误拒绝。本地加入同类记录复现后，修正读取校验并新增回归；所属资源记录和清理目标仍要求正数进程组。该次失败作业的源码检查、证据上传和状态清理成功。
 
 CI 生命周期脚本的 27 项本地行为检查通过。真实远端作业结果通过 PR Checks 和任务目录中的 CI 记录定位，不把本地脚本检查写成远端通过。
 

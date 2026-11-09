@@ -1,10 +1,16 @@
 import { equal, match, ok, rejects, throws } from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { access, readFile, readdir, writeFile } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  readFile,
+  readdir,
+  writeFile,
+} from "node:fs/promises";
 import { basename, join } from "node:path";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createManagedRun } from "../../dev/runtime/src/index.mjs";
 import {
   createTestProcessScope,
@@ -234,6 +240,39 @@ test("process birth identity includes kernel precision", () => {
       : /^linux:[0-9a-f-]+:[0-9]+$/,
   );
   ok(!identity.birth.includes(new Date().toDateString()));
+});
+
+test("unrelated kernel processes with group zero do not block cleanup", async (context) => {
+  const { run, scope } = await fixture(context);
+  const module = join(run.root, "test-processes.mjs");
+  await copyFile(fileURLToPath(processModule), module);
+  await writeFile(
+    join(run.root, "process-identity.py"),
+    `import json, subprocess, sys
+values = json.loads(subprocess.check_output([sys.executable, ${JSON.stringify(identityScript)}, *sys.argv[1:]]))
+if sys.argv[1:] == ['--all']:
+    values.append({'pid': 2, 'ppid': 0, 'pgid': 0, 'birth': 'linux:00000000-0000-0000-0000-000000000000:1', 'state': 'alive'})
+print(json.dumps(values))
+`,
+  );
+  const report = JSON.parse(
+    await evaluate(
+      { ...scope.env, AGORA_STATE_DIR: join(run.root, "probe-state") },
+      `
+    import { createManagedRun } from ${JSON.stringify(runtimeModule)};
+    import { createTestProcessScope, finishTestProcesses } from ${JSON.stringify(pathToFileURL(module).href)};
+    const run = await createManagedRun('test');
+    const scope = createTestProcessScope(run.root, process.env);
+    const report = await finishTestProcesses(scope);
+    if (report.uncertain.length) await run.retain(JSON.stringify(report));
+    else await run.release();
+    console.log(JSON.stringify(report));
+  `,
+    ),
+  );
+  equal(report.uncertain.length, 0, JSON.stringify(report));
+  equal(report.leaked.length, 0);
+  equal(report.survivors.length, 0);
 });
 
 test("a group lease survives its leader and escalates TERM-resistant members", async (context) => {

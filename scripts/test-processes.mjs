@@ -124,7 +124,8 @@ function probe(pids) {
           !(
             item.state === "alive" &&
             Number.isSafeInteger(item.ppid) &&
-            validPid(item.pgid) &&
+            Number.isSafeInteger(item.pgid) &&
+            item.pgid >= 0 &&
             validIdentity(item)
           )),
     )
