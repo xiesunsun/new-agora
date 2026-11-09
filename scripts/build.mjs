@@ -42,7 +42,7 @@ await Promise.all([
     minify: true,
   }),
   build({
-    entryPoints: ["apps/panel/src/index.tsx"],
+    entryPoints: ["apps/panel/src/index.ts"],
     outfile: `${desktopAssets}/panel.js`,
     bundle: true,
     minify: true,

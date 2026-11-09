@@ -110,7 +110,7 @@ const server = new McpServer(
   { name, version },
   {
     instructions:
-      "Agora 只处理在当前对话打开的文稿。收到面板的改稿通知后，先调用 agora_claim_next。仅当返回 claimed 时，才用原生文件工具编辑返回的 candidatePath。按批注中的原话和选区修改待审稿，保留人类已写的内容，再用同一个 executionId 调用 agora_submit_candidate。写回原文件和选择修改由用户在面板中完成。",
+      "Agora 只处理在当前对话打开的文稿。收到面板的改稿通知后，先调用 agora_claim_next。仅当返回 claimed 时，才用原生文件工具编辑返回的 candidatePath。按批注中的原话和选区修改待审稿，保留人类已写的内容，再用同一个 executionId 调用 agora_submit_candidate。领取后如失败或中断，必须用同一个 executionId 调用 agora_finish_execution 报告 failed 或 cancelled。超时和重启不能证明执行结束。写回原文件和选择修改由用户在面板中完成。",
   },
 );
 
@@ -200,6 +200,27 @@ server.registerTool(
         action: "submit",
         threadId: threadFromHost(_meta),
         executionId,
+      }),
+    ),
+);
+
+server.registerTool(
+  "agora_finish_execution",
+  {
+    description:
+      "领取后的改稿执行失败或中断时，报告同一个 executionId 的结束状态。只有已停止编辑候选文件后才能报告 cancelled。",
+    inputSchema: {
+      executionId: z.string().min(1),
+      outcome: z.enum(["failed", "cancelled"]),
+    },
+  },
+  async ({ executionId, outcome }, { _meta }) =>
+    respond(async () =>
+      worker({
+        action: "finish",
+        threadId: threadFromHost(_meta),
+        executionId,
+        outcome,
       }),
     ),
 );

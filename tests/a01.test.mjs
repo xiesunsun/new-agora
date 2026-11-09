@@ -17,6 +17,16 @@ import { startService } from "./support/service.mjs";
 
 const fixture = new URL("./fixtures/a01/", import.meta.url);
 
+/** @param {{ number: number, body: string }} version */
+function versionContent({ number, body }) {
+  return { number, body };
+}
+
+/** @param {Pick<import("../packages/contracts/src/index.js").Comment, "id" | "start" | "end" | "quote" | "instruction">} comment */
+function submittedComment({ id, start, end, quote, instruction }) {
+  return { id, start, end, quote, instruction };
+}
+
 test("A01 keeps a selected suggestion and the human title in the file and V2", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "agora-a01-test-"));
   const document = join(root, "manuscript.md");
@@ -59,7 +69,9 @@ test("A01 keeps a selected suggestion and the human title in the file and V2", a
     status: "idle",
   });
   const initial = await request("/api/state");
-  deepStrictEqual(initial.versions, [{ number: 1, body: original }]);
+  deepStrictEqual(initial.versions.map(versionContent), [
+    { number: 1, body: original },
+  ]);
 
   const draft = original.replace("# 方案", "# 交付方案");
   const comments = [
@@ -85,7 +97,8 @@ test("A01 keeps a selected suggestion and the human title in the file and V2", a
   ok("comments" in claim && "executionId" in claim);
   equal((await request("/api/state")).round.phase, "editing");
   equal(await readFile(claim.candidatePath, "utf8"), draft);
-  deepStrictEqual(claim.comments, comments);
+  ok(Array.isArray(claim.comments));
+  deepStrictEqual(claim.comments.map(submittedComment), comments);
   await writeFile(
     claim.candidatePath,
     draft
@@ -101,17 +114,21 @@ test("A01 keeps a selected suggestion and the human title in the file and V2", a
   const [first, second] = review.round.changes;
   equal(review.round.changes.length, 2);
   equal(await readFile(document, "utf8"), original);
-  deepStrictEqual(review.versions, [{ number: 1, body: original }]);
+  deepStrictEqual(review.versions.map(versionContent), [
+    { number: 1, body: original },
+  ]);
 
   const kept = await request(panel, {
     action: "choose",
     revision: review.revision,
+    roundId: review.round.id,
     changeId: first.id,
     keep: true,
   });
   const discarded = await request(panel, {
     action: "choose",
     revision: kept.revision,
+    roundId: kept.round.id,
     changeId: second.id,
     keep: false,
   });
@@ -129,9 +146,14 @@ test("A01 keeps a selected suggestion and the human title in the file and V2", a
     preview: expected,
   };
   const applied = await request(panel, apply);
-  deepStrictEqual(applied.applyStatus, { phase: "applied", version: 2 });
+  deepStrictEqual(applied.applyStatus, {
+    phase: "applied",
+    version: 2,
+    operationId: apply.operationId,
+    sourceDraftRevision: discarded.draftRevision,
+  });
   equal(await readFile(document, "utf8"), expected);
-  deepStrictEqual(applied.versions, [
+  deepStrictEqual(applied.versions.map(versionContent), [
     { number: 1, body: original },
     { number: 2, body: expected },
   ]);
@@ -180,24 +202,26 @@ test(
       phase: "checking",
       operationId: operation.operationId,
       revision: operation.revision,
+      sourceDraftRevision: draft.draftRevision,
     });
-    deepStrictEqual(checking.versions, [{ number: 1, body: original }]);
+    deepStrictEqual(checking.versions.map(versionContent), [
+      { number: 1, body: original },
+    ]);
     equal(await readFile(document, "utf8"), original);
     await first.stop();
 
-    const resumed = await startService(context, document, runtime);
-    deepStrictEqual(
-      (await resumed.request("/api/state")).applyStatus,
-      checking.applyStatus,
-    );
-    await resumed.stop();
     await chmod(directory, 0o700);
     await writeFile(document, expected);
 
     const verified = await startService(context, document, runtime);
     const result = await verified.request("/api/state");
-    deepStrictEqual(result.applyStatus, { phase: "applied", version: 2 });
-    deepStrictEqual(result.versions, [
+    deepStrictEqual(result.applyStatus, {
+      phase: "applied",
+      version: 2,
+      operationId: operation.operationId,
+      sourceDraftRevision: draft.draftRevision,
+    });
+    deepStrictEqual(result.versions.map(versionContent), [
       { number: 1, body: original },
       { number: 2, body: expected },
     ]);

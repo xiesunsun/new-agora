@@ -8,7 +8,7 @@ import type {
 } from "../../../packages/contracts/src/index.js";
 import manifest from "../.codex-plugin/plugin.json" with { type: "json" };
 
-declare const AgoraPanel: { mountPanel(transport: PanelTransport): void };
+declare const AgoraPanel: { mountPanel(transport: PanelTransport): () => void };
 
 const app = new App(
   { name: manifest.interface.displayName, version: manifest.version },
@@ -76,23 +76,24 @@ app.ontoolresult = (result) => {
   if (!opening.success) return;
 
   const { threadId } = opening.data;
-  let notifiedRequestId: string | undefined;
+  let notifiedRoundId: string | undefined;
   mounted = true;
-  AgoraPanel.mountPanel({
+  const unmount = AgoraPanel.mountPanel({
     getState: () => panelRequest(threadId),
     async run(command) {
       const state = await panelRequest(threadId, command);
       if (
-        command.action === "generate" &&
+        (command.action === "generate" || command.action === "retry") &&
         state.round?.phase === "waiting" &&
-        notifiedRequestId !== command.requestId
+        notifiedRoundId !== state.round.id
       ) {
-        notifiedRequestId = command.requestId;
+        notifiedRoundId = state.round.id;
         void notifyCodex();
       }
       return state;
     },
   });
+  window.addEventListener("pagehide", unmount, { once: true });
 };
 
 try {

@@ -1,47 +1,53 @@
-import { copyFile, mkdtemp, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 import { startService } from "../apps/service/src/server.js";
 import { startScriptedWorker } from "../apps/worker/src/index.js";
+import { viewSchema } from "../packages/contracts/src/index.js";
+import { prepareMock } from "../dev/mock/index.js";
 
 const { values } = parseArgs({
+  args: process.argv.slice(2).filter((value) => value !== "--"),
   options: {
     file: { type: "string" },
     runtime: { type: "string" },
     port: { type: "string", default: "0" },
+    mock: { type: "boolean", default: false },
+    config: { type: "string" },
   },
 });
 
-const demo = values.file === undefined && values.runtime === undefined;
-if (!demo && (!values.file || !values.runtime)) {
+const explicit = values.file !== undefined || values.runtime !== undefined;
+if (
+  explicit &&
+  (!values.file || !values.runtime || values.mock || values.config)
+) {
   throw new Error(
-    "Pass --file and --runtime together, or omit both to use the A01 test copy.",
+    "Pass --file and --runtime together. Mock configuration cannot be used with an explicit manuscript.",
   );
 }
-
 const port = z.coerce.number().int().min(0).max(65535).parse(values.port);
-const paths =
-  values.file && values.runtime
-    ? {
-        originalPath: resolve(values.file),
-        runtimeDir: resolve(values.runtime),
-      }
-    : await demoPaths();
+const mock = explicit
+  ? undefined
+  : await prepareMock(
+      values.config
+        ? resolve(values.config)
+        : fileURLToPath(
+            new URL(
+              values.mock
+                ? "../dev/mock/bookstore.json"
+                : "../dev/mock/a01.json",
+              import.meta.url,
+            ),
+          ),
+    );
+const paths = mock ?? {
+  originalPath: resolve(values.file ?? ""),
+  runtimeDir: resolve(values.runtime ?? ""),
+};
 const { originalPath, runtimeDir } = paths;
-
-async function demoPaths() {
-  const temp = await mkdtemp(join(tmpdir(), "agora-a01-"));
-  const originalPath = join(temp, "manuscript.md");
-  await copyFile(
-    new URL("../tests/fixtures/a01/original.md", import.meta.url),
-    originalPath,
-  );
-  return { originalPath, runtimeDir: join(temp, "runtime") };
-}
-
 const panelDir = fileURLToPath(new URL("./panel/", import.meta.url));
 const service = await startService({
   originalPath,
@@ -49,11 +55,16 @@ const service = await startService({
   panelDir,
   port,
 });
-
 const controller = new AbortController();
-async function stop() {
-  controller.abort();
-  await service.close();
+let worker: Promise<void> | undefined;
+let stopping: Promise<void> | undefined;
+function stop(): Promise<void> {
+  stopping ??= (async () => {
+    controller.abort();
+    await worker;
+    await service.close();
+  })();
+  return stopping;
 }
 process.once("SIGINT", () => {
   void stop();
@@ -62,24 +73,49 @@ process.once("SIGTERM", () => {
   void stop();
 });
 
-console.log(`Agora: ${service.url}`);
-console.log(`Markdown: ${originalPath}`);
-console.log(`Runtime: ${runtimeDir}`);
-
-if (demo) {
+if (mock) {
+  if (mock.comments.length) {
+    const response = await fetch(new URL("/api/state", service.url));
+    const state = viewSchema.parse(await response.json());
+    const saved = await fetch(new URL("/api/panel", service.url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "save",
+        revision: state.revision,
+        draftRevision: 0,
+        draft: state.draft,
+        comments: mock.comments,
+        commentDraft: null,
+      }),
+    });
+    if (!saved.ok) {
+      await service.close();
+      throw new Error(`Mock seed failed: ${await saved.text()}`);
+    }
+  }
   const connection = z
     .object({ workerToken: z.string() })
     .parse(
       JSON.parse(await readFile(join(runtimeDir, "connection.json"), "utf8")),
     );
-  void startScriptedWorker(
+  worker = startScriptedWorker(
     service.url,
     connection.workerToken,
     controller.signal,
-  ).catch(async (error: unknown) => {
-    if (controller.signal.aborted) return;
+    mock.worker,
+  ).catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;
-    await stop();
+    controller.abort();
+    void service.close();
   });
+}
+console.log(`Agora: ${service.url}`);
+console.log(`Markdown: ${originalPath}`);
+console.log(`Runtime: ${runtimeDir}`);
+
+if (mock) {
+  console.log(`Mock config: ${mock.configPath}`);
+  console.log(`Config SHA-256: ${mock.configDigest}`);
 }

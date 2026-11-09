@@ -1,0 +1,53 @@
+{
+  "manuscript": "bookstore.md",
+  "comments": [
+    {
+      "quote": "这也许是街上最不费力的一种邀请",
+      "instruction": "用门口的细节说明这句话"
+    },
+    {
+      "quote": "三家店对顾客都很友好",
+      "instruction": "具体比较谁能不消费也坐下"
+    }
+  ],
+  "worker": {
+    "threadId": "ink-bookstore",
+    "pollMs": 150,
+    "editMs": 650,
+    "rules": [
+      {
+        "quote": "这也许是街上最不费力的一种邀请",
+        "replacement": "一张矮凳和一句「不用买书」，把停留的许可放在了门口"
+      },
+      {
+        "quote": "三家店对顾客都很友好",
+        "replacement": "只有街角书店把座位留在门外，路过的人无需进店就能坐下"
+      },
+      {
+        "quote": "街角书店的公共生活",
+        "replacement": "街角书店，给路人一个停留的地方"
+      },
+      {
+        "quote": "门口的十分钟",
+        "replacement": "一张矮凳留住的十分钟"
+      },
+      {
+        "quote": "把停留留给谁",
+        "replacement": "不买书的人，也能坐下来"
+      },
+      {
+        "quote": "书店把一张矮凳搬到门口。",
+        "replacement": "一张矮凳被搬到书店门口，留给路过的人歇脚。"
+      },
+      {
+        "quote": "路过的家长停下来整理孩子的围巾。",
+        "replacement": "路过的家长在门口停下，替孩子理好围巾。"
+      }
+    ],
+    "results": [
+      {
+        "kind": "rules"
+      }
+    ]
+  }
+}

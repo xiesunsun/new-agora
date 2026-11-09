@@ -1,12 +1,7 @@
 import { diffLines } from "diff";
 
-export type TextChange = {
-  id: string;
-  start: number;
-  end: number;
-  before: string;
-  after: string;
-};
+import type { TextChange } from "./types.js";
+export type { TextChange } from "./types.js";
 
 export function changesBetween(before: string, after: string): TextChange[] {
   const parts = diffLines(before, after, { maxEditLength: 4096 });
@@ -59,4 +54,88 @@ export function applyChanges(
   }
   result.push(base.slice(offset));
   return result.join("");
+}
+
+export { reviewUnitsBetween } from "./review.js";
+
+export type CommentAnchor = {
+  start: number;
+  end: number;
+  quote: string;
+  resolved: boolean;
+  focusOffset: number;
+};
+
+export function reanchorComments<T extends CommentAnchor>(
+  comments: readonly T[],
+  before: string,
+  after: string,
+): T[] {
+  let left = 0;
+  while (
+    left < before.length &&
+    left < after.length &&
+    before[left] === after[left]
+  )
+    left++;
+  let oldRight = before.length;
+  let newRight = after.length;
+  while (
+    oldRight > left &&
+    newRight > left &&
+    before[oldRight - 1] === after[newRight - 1]
+  ) {
+    oldRight--;
+    newRight--;
+  }
+  const delta = after.length - before.length;
+  return comments.map((source) => {
+    const note = {
+      ...source,
+      focusOffset:
+        source.focusOffset >= source.start && source.focusOffset <= source.end
+          ? source.focusOffset
+          : source.end,
+    };
+    if (!note.resolved) return { ...note };
+    if (
+      !note.quote ||
+      note.start < 0 ||
+      note.end < note.start ||
+      before.slice(note.start, note.end) !== note.quote
+    )
+      return { ...note, resolved: false };
+    if (note.end <= left) return { ...note };
+    if (
+      note.start >= oldRight &&
+      after.slice(note.start + delta, note.end + delta) === note.quote
+    )
+      return {
+        ...note,
+        start: note.start + delta,
+        end: note.end + delta,
+        focusOffset: note.focusOffset + delta,
+      };
+    const first = after.indexOf(note.quote);
+    const prefix = before.slice(Math.max(0, note.start - 12), note.start);
+    const suffix = before.slice(note.end, note.end + 12);
+    const unique = first >= 0 && after.indexOf(note.quote, first + 1) < 0;
+    const context =
+      unique &&
+      ((prefix &&
+        after.slice(Math.max(0, first - prefix.length), first) === prefix) ||
+        (suffix &&
+          after.slice(
+            first + note.quote.length,
+            first + note.quote.length + suffix.length,
+          ) === suffix));
+    return context
+      ? {
+          ...note,
+          start: first,
+          end: first + note.quote.length,
+          focusOffset: first + note.focusOffset - note.start,
+        }
+      : { ...note, resolved: false };
+  });
 }

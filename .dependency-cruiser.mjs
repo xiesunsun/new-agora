@@ -2,6 +2,7 @@ const sharedImports = {
   "apps/panel": ["packages/contracts", "packages/text"],
   "apps/service": ["packages/contracts", "packages/text"],
   "apps/worker": ["packages/contracts"],
+  "dev/mock": ["apps/worker", "packages/contracts"],
   "plugins/desktop": ["packages/contracts"],
   "packages/contracts": [],
   "packages/text": [],
