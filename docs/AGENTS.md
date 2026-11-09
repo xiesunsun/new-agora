@@ -8,13 +8,14 @@
 | 子目录 `AGENTS.md` | 仅适用于该目录的规则，链接上级约束 |
 | `docs/repository-workflow.md` | 分支、worktree、目录与命名约束 |
 | `docs/development.md` | 安装、运行、检查、基线和审阅步骤 |
+| `docs/development-lifecycle.md` | 任务收尾、hook 触发范围、状态目录与资源回收协议 |
 | `docs/architecture.md` | 当前模块职责、状态归属与调用方向 |
 | `docs/flows` | 用户操作、系统结果和失败恢复 |
 | 模块 `README.md` | 本模块的接口、配置、入口与限制 |
 | `docs/decisions` | 仍影响设计的取舍、原因和替代方案 |
 | `docs/plans` | 特定任务的范围、基线、验收和剩余工作 |
 | `tests/README.md` | 可复现的验收步骤和预期结果 |
-| `evidence/<topic>` | 指定提交或构建实际执行的命令、结果和产物 |
+| `evidence/<topic>` | 指定提交或构建的简短验证索引，链接受管归档或 CI artifact |
 | `docs/archive` | 历史索引，不作为当前实现的依据 |
 
 当前说明写已经存在的行为。计划在开头标明进行中、已交付或被取代，并单列尚未验收的部分。完成实现后同步当前说明，再关闭计划。证据标明观察日期、构建和验证边界，不能把旧构建的通过记录写成当前验收。
@@ -24,3 +25,5 @@
 新建计划使用 `YYYY-MM-DD-<topic>.md`，决策使用描述问题的 `<topic>.md`。已有文件不为符合新命名而搬迁。当前机器的路径、分支和 worktree 清单放在有日期的任务证据中。长期规则用相对位置和职责名称表达。
 
 可执行规则由源码或检查配置定义，文档说明其用途并链接过去。共享开发约束必须进入 Git 跟踪的文件，不能只留在本机忽略的技能目录或聊天中。改完文档运行 `python3 scripts/check-doc-links.py`。
+
+原始日志、截图、数据库、操作轨迹、临时脚本和构建产物不提交到源码仓库，按[资源协议](development-lifecycle.md)保存和回收。历史产物移出时先核对归档摘要，并保留固定提交或 artifact 链接。

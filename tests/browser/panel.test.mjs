@@ -9,13 +9,25 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { createManagedRun } from "../../dev/runtime/src/index.mjs";
 import { chromium } from "playwright";
 import { startService } from "../support/service.mjs";
 
+const ownRun = process.env.AGORA_TEST_EVIDENCE_DIR
+  ? undefined
+  : await createManagedRun("test");
+const evidenceDir =
+  process.env.AGORA_TEST_EVIDENCE_DIR ?? join(ownRun?.root ?? "", "evidence");
+after(async () => {
+  await ownRun?.release();
+});
+
 /** @param {import('node:test').TestContext} context @param {string} [body] */
 async function setup(context, body) {
-  const root = await mkdtemp(join(tmpdir(), "agora-ink-browser-"));
+  const root = await mkdtemp(
+    join(ownRun?.root ?? tmpdir(), "agora-panel-browser-"),
+  );
   context.after(() => rm(root, { recursive: true, force: true }));
   const document = join(root, "manuscript.md");
   if (body === undefined)
@@ -69,7 +81,7 @@ async function dockAction(page, name) {
 async function captureScene(page, scene) {
   const original = page.viewportSize();
   const y = await page.evaluate(() => scrollY);
-  await mkdir("/tmp/agora-ink-evidence", { recursive: true });
+  await mkdir(evidenceDir, { recursive: true });
   for (const width of [1280, 760, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.waitForTimeout(40);
@@ -79,7 +91,7 @@ async function captureScene(page, scene) {
     )
       await page.locator("#brand").click();
     await page.screenshot({
-      path: `/tmp/agora-ink-evidence/${scene}-${width}.png`,
+      path: join(evidenceDir, `${scene}-${width}.png`),
       fullPage: true,
     });
   }
@@ -90,7 +102,7 @@ async function captureScene(page, scene) {
   );
 }
 
-test("Ink preserves note IME, geometry, settled readback, save and history through the built service", async (context) => {
+test("panel preserves note IME, geometry, settled readback, save and history through the built service", async (context) => {
   const {
     page,
     document: targetPath,
@@ -146,9 +158,9 @@ test("Ink preserves note IME, geometry, settled readback, save and history throu
     ok(geometry.clear, `pen overlaps text at ${width}`);
     ok(geometry.width >= 44 && geometry.height >= 44);
     equal(geometry.overflow, false);
-    await mkdir("/tmp/agora-ink-evidence", { recursive: true });
+    await mkdir(evidenceDir, { recursive: true });
     await page.screenshot({
-      path: `/tmp/agora-ink-evidence/pen-${width}.png`,
+      path: join(evidenceDir, `pen-${width}.png`),
       fullPage: true,
     });
   }
@@ -237,7 +249,7 @@ test("Ink preserves note IME, geometry, settled readback, save and history throu
     .getByRole("button", { name: "接受第 1 处修改", exact: true })
     .waitFor();
   await page.screenshot({
-    path: "/tmp/agora-ink-evidence/review.png",
+    path: join(evidenceDir, "review.png"),
     fullPage: true,
   });
   await captureScene(page, "review");
@@ -271,7 +283,7 @@ test("Ink preserves note IME, geometry, settled readback, save and history throu
     before.round.decisions,
   );
   await page.screenshot({
-    path: "/tmp/agora-ink-evidence/readback.png",
+    path: join(evidenceDir, "readback.png"),
     fullPage: true,
   });
   await captureScene(page, "readback");

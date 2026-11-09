@@ -4,7 +4,7 @@
 
 ## 运行检查
 
-准备 Node.js 22.13 或更新的 22.x 版本、pnpm 9.15.0、Python 3.9 或更新版本，以及 Git。在仓库根目录安装依赖并运行检查。
+在 macOS 或 Linux 准备 Node.js 22.13 或更新的 22.x 版本、pnpm 9.15.0、Python 3.9 或更新版本，以及 Git。在仓库根目录安装依赖并运行检查。进程归属检查依赖这两个平台的进程身份接口。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -19,6 +19,7 @@ pnpm check
 | `pnpm format:check` | 代码和配置的格式。Markdown 走链接检查 |
 | `pnpm lint` | 代码正确性、显式 `any`、TypeScript 抑制指令和计算生成的导入路径 |
 | `pnpm typecheck` | TypeScript 严格类型检查 |
+| `pnpm check:repository` | 仓库根目录、运行数据和生成产物的归属 |
 | `pnpm check:architecture` | 生产源码的依赖方向、公开入口、循环与无法解析的导入 |
 | `pnpm test` | 仓库自动化测试 |
 | `pnpm test:browser` | 构建并启动 Agora，用 Chromium 验证文稿编辑器可见、可编辑并加载正确正文 |
@@ -26,7 +27,7 @@ pnpm check
 
 运行 `pnpm dev` 打开 [A01 测试文稿](../tests/README.md#a01)。命令会构建实际面板和服务，并打印预览地址、Markdown 副本和运行目录。要单独构建发布入口，运行 `pnpm build`。
 
-运行 `pnpm mock` 打开已确认的墨间书店示例。运行 `pnpm mock --config /absolute/path/scenario.json` 更换初始文稿、批注、生成结果与延迟。每次使用隔离的测试副本，配置和模拟执行不进入面板。[mock 场景说明](../dev/mock/README.md)给出字段与真实服务入口。
+运行 `pnpm mock` 打开已确认的书店示例。运行 `pnpm mock --config /absolute/path/scenario.json` 更换初始文稿、批注、生成结果与延迟。每次使用隔离的测试副本，配置和模拟执行不进入面板。[mock 场景说明](../dev/mock/README.md)给出字段与真实服务入口。
 
 本仓库源码保持严格类型检查。`skipLibCheck` 跳过依赖声明文件的检查，兼容桌面 MCP SDK 声明中省略扩展名的导入。
 
@@ -34,19 +35,17 @@ pnpm check
 
 从用户指定的主项目目录打开 Agora。普通任务沿用该目录，需要隔离时按 [worktree 规则](repository-workflow.md#主目录与-worktree)记录用途和回收条件。选择共享的 `Agora` 本地环境后，由 Codex 新建的 worktree 会安装锁定的依赖和无头 Chromium。顶栏的 **启动 A01**、**浏览器冒烟** 和 **全量检查** 调用本页的相同命令。环境初始化要求本机已有 Node.js 和 pnpm。参见 [Codex 本地环境](https://learn.chatgpt.com/docs/environments/local-environment)。
 
-在 Codex 的 **Settings > Hooks** 审阅并信任 Agora 的 `SessionStart` hook。新聊天启动时，hook 读取 worktree、分支和已有改动状态，并提示开工前记录基线。基线仍由开发者确认和保存。参见 [Codex Hooks](https://learn.chatgpt.com/docs/hooks)。
+在 Codex 的 **Settings > Hooks** 审阅并信任 Agora 的项目 hook。`SessionStart` 报告真实目录和 session，`Stop` 检查明确请求的收尾，`PreToolUse` 执行已知的工具限制。改动定义后需要重新审阅信任。配置、脚本验证和宿主实际触发分开记录，见[任务收尾与资源回收](development-lifecycle.md)及 [Codex Hooks](https://learn.chatgpt.com/docs/hooks)。
 
 ## 固定开发基线
 
-开工前记录已接受的基线提交。工作树已有未提交改动时，在仓库根目录保存清单，完成后对照清单审查本轮增量。
+开工前按[任务协议](development-lifecycle.md#开始与关闭任务)建立有名字的外部任务目录。`begin` 调用基线脚本保存提交、路径和摘要。工作树已有改动时，先确认归属；完成后对照清单审查本轮增量。
 
 ```sh
-baseline_dir=$(mktemp -d)
-python3 scripts/worktree-baseline.py capture "$baseline_dir/before.json"
-python3 scripts/worktree-baseline.py diff "$baseline_dir/before.json"
+pnpm task begin 2026-11-09-save-recovery
 ```
 
-清单记录当前 `HEAD`、文件路径和 SHA-256。它覆盖已跟踪文件和未忽略的未跟踪文件。比较按路径列出新增、修改和删除，逐项确认归属后再暂存本轮文件。清单和临时运行数据保存在仓库外。
+清单记录当前 `HEAD`、文件路径和 SHA-256。它覆盖已跟踪文件和未忽略的未跟踪文件。需要逐项比较时，对 `begin` 打印的 `baseline.json` 运行 `python3 scripts/worktree-baseline.py diff`，确认归属后再暂存本轮文件。清单和运行数据都归入统一状态目录。
 
 ## 写代码和测试
 
@@ -61,6 +60,6 @@ python3 scripts/worktree-baseline.py diff "$baseline_dir/before.json"
 
 ## 准备审阅证据
 
-提交前运行 `pnpm check`。PR 记录基线、实际执行的命令、场景和结果。界面变更附同一构建的截图或录屏，标明构建版本或摘要及实际入口。桌面接入、打包和发布验收使用实际安装的插件。按 [A01](../tests/README.md#a01) 和 [A03](../tests/README.md#a03) 验证真实 Codex 宿主，并单列结果。
+提交前运行 `pnpm check`。PR 记录基线、实际执行的命令、场景和结果。界面变更链接同一构建的截图或录屏，标明构建版本或摘要及实际入口。原始产物保存在受管状态目录或 CI artifacts，源码仓库只留简短索引。桌面接入、打包和发布验收使用实际安装的插件。按 [A01](../tests/README.md#a01) 和 [A03](../tests/README.md#a03) 验证真实 Codex 宿主，并单列结果。
 
 自动检查通过后，审阅者仍需判断代码是否易读、职责是否清楚、交互是否符合预期。每份变更围绕一个可验收的结果。新增依赖、跨模块入口或规则例外时，在 PR 说明调用场景和取舍。改动用户可见行为时更新对应流程和验收。把今后仍会影响设计的取舍记在[决策记录](decisions/README.md)里。

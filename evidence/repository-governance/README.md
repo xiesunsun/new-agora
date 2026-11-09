@@ -1,5 +1,7 @@
 # 仓库约束核对记录
 
+本页是 `dc0e595` 的历史核对记录。当前收尾与资源机制见[后续验收](../development-lifecycle/README.md)。原始日志已归入统一状态目录，链接固定到当时提交。
+
 观察日期为 2026-11-09。Agora 已接受的基线为 `204dac28bdc04119abd36ca1ad291b19322a81af`。本轮在 `/Users/ssunxie/code/new_agora` 从该提交建立 `codex/docs-repository-governance`，没有新增 worktree。文档依赖尚未合并的 Ink 接入内容，父分支为 `codex/ink-integration`，[父 PR 为 #1](https://github.com/xiesunsun/new-agora/pull/1)。
 
 开工时主目录干净。仓库外基线与原始 Git 清单保存在 `/var/folders/fd/15y1w99s05730vn0zr1d00cr0000gn/T/agora-repository-governance-7i8cayif/`。这是本机临时记录，不是跨机器交付依赖。
@@ -37,6 +39,6 @@
 
 本轮仅修改开发说明与入口链接。没有实现新的 Git 或目录检查器。
 
-主代理运行 `pnpm check` 通过。[完整输出](check.log)记录格式、lint、严格类型、依赖检查及 72 项测试通过，无失败、取消或跳过。文档检查覆盖 32 份 Markdown 和 165 个本地链接。追加日志链接后再次运行文档检查，32 份 Markdown 和 166 个本地链接通过。
+主代理运行 `pnpm check` 通过。[完整输出](https://github.com/xiesunsun/new-agora/blob/dc0e595a69e558f062a7246b93a8023b5d2c8be2/evidence/repository-governance/check.log)记录格式、lint、严格类型、依赖检查及 72 项测试通过，无失败、取消或跳过。文档检查覆盖 32 份 Markdown 和 165 个本地链接。追加日志链接后再次运行文档检查，32 份 Markdown 和 166 个本地链接通过。
 
 no-comments 审阅没有发现需处理的注释或抑制指令，删除、恢复和重跑均为 0。独立文档审阅核对了事实归属、来源、现有模块职责与执行边界，结论为通过。两位审阅者只读，本轮文件仍由主代理统一修改。

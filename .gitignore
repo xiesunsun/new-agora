@@ -1,5 +1,6 @@
 /.codex/*
 !/.codex/hooks.json
+!/.codex/tool-policy.json
 !/.codex/environments/
 /.codex/environments/*
 !/.codex/environments/environment.toml

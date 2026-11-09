@@ -11,7 +11,7 @@
     }
   ],
   "worker": {
-    "threadId": "ink-bookstore",
+    "threadId": "mock-bookstore",
     "pollMs": 150,
     "editMs": 650,
     "rules": [

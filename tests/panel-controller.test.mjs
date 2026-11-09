@@ -2,8 +2,8 @@ import { test } from "node:test";
 import { deepEqual, equal, rejects } from "node:assert/strict";
 import { register } from "node:module";
 register("./panel-loader.mjs", import.meta.url);
-const { createInkController } =
-  await import("../apps/panel/src/ink/controller.js");
+const { createPanelController } =
+  await import("../apps/panel/src/editor/controller.js");
 /** @returns {import('../packages/contracts/src/index.js').View} */
 const initial = () => ({
   documentId: "doc",
@@ -41,7 +41,7 @@ test("a failed save preserves composer and prevents generation", async () => {
   const view = initial();
   /** @type {import('../packages/contracts/src/index.js').PanelCommand[]} */
   const calls = [];
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async (command) => {
@@ -76,7 +76,7 @@ test("queued saves capture immutable inputs and older polls cannot replace typin
   const calls = [];
   /** @type {{promise: Promise<import('../packages/contracts/src/index.js').View>,resolve: (view: import('../packages/contracts/src/index.js').View)=>void} | null} */
   let poll = null;
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: () => (poll ? poll.promise : Promise.resolve(view)),
       run: async (command) => {
@@ -121,7 +121,7 @@ test("confirmation is invalid after a later input or canonical revision", async 
   const view = initial();
   /** @type {import('../packages/contracts/src/index.js').PanelCommand[]} */
   const calls = [];
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async (command) => {
@@ -141,7 +141,7 @@ test("confirmation is invalid after a later input or canonical revision", async 
 test("a late apply receipt never labels newer input saved", async () => {
   let view = initial();
   const pending = deferred();
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async (command) => {
@@ -183,7 +183,7 @@ test("a late apply receipt never labels newer input saved", async () => {
 });
 test("generate uses the canonical saved comment revisions and anchors", async () => {
   let view = initial();
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async (command) => {
@@ -242,7 +242,7 @@ test("rapid choices serialize canonical revisions and retain the round identity"
   const pending = deferred();
   /** @type {import('../packages/contracts/src/index.js').PanelCommand[]} */ const commands =
     [];
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async (command) => {
@@ -288,7 +288,7 @@ test("rapid choices serialize canonical revisions and retain the round identity"
 test("a canonical revision invalidates an open confirmation", async () => {
   let view = initial();
   let commands = 0;
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async () => {
@@ -312,7 +312,7 @@ test("an unknown apply response refreshes and rechecks the original operation wi
   let view = initial();
   /** @type {import('../packages/contracts/src/index.js').PanelCommand[]} */ const commands =
     [];
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async (command) => {
@@ -406,7 +406,7 @@ test("failed discard and deletion preserve the original composer and confirmed c
       focusOffset: 9,
       direction: "forward",
     };
-    const controller = createInkController(
+    const controller = createPanelController(
       {
         getState: async () => view,
         run: async () => {
@@ -432,7 +432,7 @@ test("disposing during a save prevents a queued generation from dispatching", as
   let view = initial();
   const pending = deferred();
   /** @type {string[]} */ const commands = [];
-  const controller = createInkController(
+  const controller = createPanelController(
     {
       getState: async () => view,
       run: async (command) => {

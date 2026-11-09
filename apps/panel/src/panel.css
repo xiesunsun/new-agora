@@ -4,7 +4,7 @@
     color-scheme: light;
     --paper: #fffdf9;
     --canvas: #eeedea;
-    --ink: #302f2c;
+    --text-color: #302f2c;
     --muted: #8d8a83;
     --line: #dedbd4;
     --accent: #dfe6e8;
@@ -19,7 +19,7 @@
   body {
     margin: 0;
     background: var(--canvas);
-    color: var(--ink);
+    color: var(--text-color);
     font-family: var(--sans);
     font-size: 14px;
   }
@@ -155,21 +155,21 @@
   .brand[aria-expanded="true"]:after {
     display: none;
   }
-  .ink-ring {
+  .brand-ring {
     fill: #46443f;
   }
-  .ink-tail {
+  .brand-tail {
     fill: #aaa8a1;
   }
-  .ink-bead {
+  .brand-bead {
     fill: #45433d;
     opacity: 0;
   }
-  .ink-attention {
+  .brand-attention {
     fill: #b28d57;
     opacity: 0;
   }
-  .ink-flow {
+  .brand-flow {
     stroke: #3c3932;
     stroke-width: 4.5;
     stroke-linecap: round;
@@ -262,7 +262,7 @@
     padding: 5px 0;
   }
   .quiet-action:hover {
-    color: var(--ink);
+    color: var(--text-color);
   }
   .version-label {
     font-family: var(--sans);
@@ -416,7 +416,7 @@
     width: 520px;
     max-width: calc(100% - 32px);
     background: var(--paper);
-    color: var(--ink);
+    color: var(--text-color);
     box-shadow: 0 28px 90px #302d2322;
   }
   .help::backdrop {
@@ -956,32 +956,32 @@
       filter: drop-shadow(0 0 7px #abb99a55);
     }
   }
-  .brand[data-state="busy"] .ink-flow {
+  .brand[data-state="busy"] .brand-flow {
     opacity: 0.94;
     animation: flow 1.4s linear infinite;
   }
   .brand[data-state="waiting"] svg {
     animation: breathe 2.5s ease-in-out infinite;
   }
-  .brand[data-state="result"] .ink-bead {
+  .brand[data-state="result"] .brand-bead {
     opacity: 1;
   }
   .brand[data-state="result"] {
     animation: arrive 700ms ease-out;
   }
-  .brand[data-state="attention"] .ink-attention {
+  .brand[data-state="attention"] .brand-attention {
     opacity: 1;
   }
   .brand.confirmed svg {
     animation: confirm 700ms ease-out;
   }
   .note-node.pulsing .note-tab-svg {
-    animation: tab-ink 1.8s ease-in-out infinite;
+    animation: note-tab-pulse 1.8s ease-in-out infinite;
   }
   .range-focus.flowing path {
     animation:
-      ink-dashes 2.4s linear infinite,
-      locate-ink 220ms ease-out;
+      range-dash-flow 2.4s linear infinite,
+      range-focus-appear 220ms ease-out;
   }
   .history:not([hidden]) {
     animation: film-in 240ms ease-out;
@@ -1011,7 +1011,7 @@
       opacity: 0.55;
     }
   }
-  @keyframes locate-ink {
+  @keyframes range-focus-appear {
     from {
       opacity: 0.2;
     }
@@ -1019,12 +1019,12 @@
       opacity: 1;
     }
   }
-  @keyframes ink-dashes {
+  @keyframes range-dash-flow {
     to {
       stroke-dashoffset: -16;
     }
   }
-  @keyframes tab-ink {
+  @keyframes note-tab-pulse {
     50% {
       fill: #dae3e4;
       stroke: #687e84;
@@ -1202,7 +1202,7 @@
     border: 1px solid #e1ddd5;
     border-radius: 14px;
     background: var(--paper);
-    color: var(--ink);
+    color: var(--text-color);
     font-family: var(--sans);
     box-shadow:
       0 18px 55px #302d231a,

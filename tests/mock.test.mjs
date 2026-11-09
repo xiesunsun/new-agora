@@ -1,8 +1,8 @@
-import { equal, notEqual, ok } from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { equal, notEqual, ok, rejects } from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
 import { z } from "zod";
@@ -10,11 +10,16 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { startService } from "./support/service.mjs";
 
-/** @param {import('node:test').TestContext} context @param {string} [config] */
-async function launch(context, config) {
+/** @param {import('node:test').TestContext} context @param {string} [config] @param {boolean} [retain] */
+async function launch(context, config, retain = false) {
   const child = spawn(
     process.execPath,
-    ["dist/run.js", "--mock", ...(config ? ["--", "--config", config] : [])],
+    [
+      "dist/run.js",
+      "--mock",
+      ...(retain ? ["--retain-run"] : []),
+      ...(config ? ["--", "--config", config] : []),
+    ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
   let output = "";
@@ -53,6 +58,20 @@ async function launch(context, config) {
         ok(response.ok, JSON.stringify(state));
         return state;
       }
+      if (retain)
+        context.after(async () => {
+          await stop();
+          const cleanup = spawnSync(
+            process.execPath,
+            [
+              "scripts/clean-development.mjs",
+              "--remove",
+              basename(dirname(document)),
+            ],
+            { encoding: "utf8" },
+          );
+          equal(cleanup.status, 0, cleanup.stderr);
+        });
       return {
         document,
         runtime,
@@ -157,6 +176,8 @@ test("two configured mocks use isolated manuscripts, workers and real save/versi
     equal(saved.versions[1].body, expected);
     equal(await readFile(source, "utf8"), original);
     await mock.stop();
+    await rejects(access(mock.document));
+    await rejects(access(mock.runtime));
   }
 });
 
@@ -212,7 +233,7 @@ test("stopping a claimed scripted worker persists a genuine cancelled receipt", 
       },
     }),
   );
-  const mock = await launch(context, config);
+  const mock = await launch(context, config, true);
   await mock.request(generation(await mock.request()));
   const editing = await waitFor(
     mock.request,

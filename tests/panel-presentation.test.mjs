@@ -3,15 +3,17 @@ import { deepEqual, equal, ok } from "node:assert/strict";
 import { register } from "node:module";
 register("./panel-loader.mjs", import.meta.url);
 const { reviewDocument, parts } =
-  await import("../apps/panel/src/ink/review-document.js");
-const { reviewRuns } = await import("../apps/panel/src/ink/review-runs.js");
-const { orbitLayout } = await import("../apps/panel/src/ink/orbit-layout.js");
-const { rulerSlots } = await import("../apps/panel/src/ink/history-ruler.js");
+  await import("../apps/panel/src/editor/review-document.js");
+const { reviewRuns } = await import("../apps/panel/src/editor/review-runs.js");
+const { orbitLayout } =
+  await import("../apps/panel/src/editor/orbit-layout.js");
+const { rulerSlots } =
+  await import("../apps/panel/src/editor/history-ruler.js");
 const { choosePenPosition } =
-  await import("../apps/panel/src/ink/pen-placement.js");
+  await import("../apps/panel/src/editor/pen-placement.js");
 
 test("settled inline reading contains each selected sentence once and readback does not mutate choices", () => {
-  /** @type {import('../apps/panel/src/ink/review-document.js').ReviewProjectionInput} */
+  /** @type {import('../apps/panel/src/editor/review-document.js').ReviewProjectionInput} */
   const review = {
     base: "甲句。乙句。",
     candidate: "甲新句。乙新句。",
@@ -21,7 +23,7 @@ test("settled inline reading contains each selected sentence once and readback d
     ],
     choices: { a: "keep", b: "discard" },
   };
-  /** @type {import('../apps/panel/src/ink/review-document.js').ReviewProjectionInput} */ const input =
+  /** @type {import('../apps/panel/src/editor/review-document.js').ReviewProjectionInput} */ const input =
     review;
   const output = reviewDocument(input);
   let text = "";
@@ -119,7 +121,7 @@ test("the orbit uses 44 pixel controls and a pen never returns a colliding place
 
 test("textarea mapping retains raw UTF-16 boundaries and unchanged separators across separate edits", async () => {
   const { textareaText, editorOffset, editExactText } =
-    await import("../apps/panel/src/ink/exact-text.js");
+    await import("../apps/panel/src/editor/exact-text.js");
   const raw = "\uFEFF甲\r\n🙂\r乙\n丙";
   deepEqual(textareaText(raw), {
     value: "\uFEFF甲\n🙂\n乙\n丙",
