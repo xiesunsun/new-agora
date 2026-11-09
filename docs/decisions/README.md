@@ -19,3 +19,7 @@ Codex 用原生工具改待审 Markdown。Agora 读回结果，和本轮底稿�
 ## 历史资料
 
 早期试用在原路径上编辑，再分开确认版本与对齐文件。相关故障记录仍可供设计参考。参见[旧文档索引](../archive/README.md)和[历史证据](../../evidence/README.md)。
+
+## Ink 接入
+
+[Ink 界面与 mock 的接入边界](ink-integration.md)记录正式服务、界面与开发场景的分工。
