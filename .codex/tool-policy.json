@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "blocked_tools": [
+    {
+      "name": "mcp__codex_apps__github_create_pull_request",
+      "reason": "This tool returned HTTP 403 twice in this repository session. Use gh pr create. Verify that permissions have changed before removing this restriction.",
+      "fallback": "gh pr create"
+    }
+  ]
+}

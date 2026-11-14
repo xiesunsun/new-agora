@@ -9,6 +9,8 @@
 | 怎么选中想保留的修改？什么时候写回文件并保存版本？ | [审阅与写回](flows/review.md) |
 | 在哪里查看已保存的版本？ | [查看历史版本](flows/history-and-restore.md) |
 | 怎么复现问题，应该看到什么结果？ | [验证步骤和预期结果](../tests/README.md) |
+| 分支、worktree、源码目录和文档怎么管理？ | [仓库与命名约束](repository-workflow.md)和[文档归属规则](AGENTS.md) |
+| 开发任务结束时怎么复盘，临时目录由谁回收？ | [任务收尾与资源回收](development-lifecycle.md) |
 | 旧版有哪些操作在 Codex 桌面版上试过？ | [以往的验证记录](../evidence/README.md) |
 
 在本仓库实现功能时，先看[代码分工](architecture.md)。改了用户看到的结果时，更新上表相应的说明和验收步骤。只改内部做法时，更新所属模块的说明。产品和实现取舍见[决策记录](decisions/README.md)。

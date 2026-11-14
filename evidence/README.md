@@ -1,6 +1,10 @@
 # 验收记录
 
-## 当前实现
+## 开发流程
+
+[任务收尾与资源验收](development-lifecycle/README.md)记录受管运行、源码边界与 hook 的验证范围。原型接入的历史产物见[接入索引](ink-integration/README.md)。原始日志与截图保存在受管归档或 CI artifacts。
+
+## 早期实现
 
 | 构建与入口 | 验收结果 |
 | --- | --- |

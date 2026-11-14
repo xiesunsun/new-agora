@@ -3,7 +3,6 @@
     "allowJs": true,
     "checkJs": true,
     "forceConsistentCasingInFileNames": true,
-    "jsx": "react-jsx",
     "module": "NodeNext",
     "noEmit": true,
     "skipLibCheck": true,
@@ -17,7 +16,8 @@
     "packages/**/*",
     "plugins/**/*",
     "scripts/**/*",
-    "tests/**/*"
+    "tests/**/*",
+    "dev/**/*"
   ],
-  "exclude": ["**/dist", "**/node_modules"]
+  "exclude": ["**/dist", "**/node_modules", "apps/panel"]
 }

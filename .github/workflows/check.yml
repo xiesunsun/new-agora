@@ -12,10 +12,24 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      AGORA_TASK_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - id: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
+      - name: Initialize managed state
+        id: state
+        run: |
+          test -n "$RUNNER_TEMP"
+          test "$RUNNER_TEMP" != /
+          test ! -L "$RUNNER_TEMP/agora"
+          mkdir -p "$RUNNER_TEMP/agora/logs"
+          printf 'AGORA_STATE_DIR=%s/agora\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
@@ -25,4 +39,45 @@ jobs:
           python-version: "3.12"
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps --only-shell chromium
-      - run: pnpm check
+      - name: Run checks
+        run: pnpm check 2>&1 | tee "$AGORA_STATE_DIR/logs/check.log"
+      - name: Verify checkout remains unchanged
+        if: ${{ always() && steps.checkout.outcome == 'success' }}
+        run: |
+          status=0
+          git diff --exit-code --stat HEAD -- || status=$?
+          untracked="$(git ls-files --others --exclude-standard)"
+          if test -n "$untracked"; then
+            printf 'Unexpected untracked files:\n%s\n' "$untracked"
+            status=1
+          fi
+          exit "$status"
+      - name: Locate failure evidence
+        id: evidence
+        if: ${{ (failure() || cancelled()) && steps.state.outcome == 'success' }}
+        run: |
+          if test -d "$AGORA_STATE_DIR"; then
+            printf 'available=true\n' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload failure evidence
+        if: ${{ (failure() || cancelled()) && steps.evidence.outputs.available == 'true' }}
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: agora-${{ env.AGORA_TASK_ID }}
+          path: |
+            ${{ env.AGORA_STATE_DIR }}/logs/
+            ${{ env.AGORA_STATE_DIR }}/runs/*/owner.json
+            ${{ env.AGORA_STATE_DIR }}/runs/*/processes/
+            ${{ env.AGORA_STATE_DIR }}/runs/*/process-report.json
+            ${{ env.AGORA_STATE_DIR }}/runs/*/evidence/
+          retention-days: 7
+          include-hidden-files: false
+          if-no-files-found: warn
+      - name: Release managed state
+        if: ${{ always() && steps.state.outcome == 'success' }}
+        run: |
+          test -n "$RUNNER_TEMP"
+          test "$RUNNER_TEMP" != /
+          test "$AGORA_STATE_DIR" = "$RUNNER_TEMP/agora"
+          test ! -L "$AGORA_STATE_DIR"
+          rm -rf -- "$AGORA_STATE_DIR"

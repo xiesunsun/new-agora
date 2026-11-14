@@ -2,6 +2,8 @@ const sharedImports = {
   "apps/panel": ["packages/contracts", "packages/text"],
   "apps/service": ["packages/contracts", "packages/text"],
   "apps/worker": ["packages/contracts"],
+  "dev/mock": ["apps/worker", "packages/contracts", "dev/runtime"],
+  "dev/runtime": [],
   "plugins/desktop": ["packages/contracts"],
   "packages/contracts": [],
   "packages/text": [],
@@ -37,7 +39,7 @@ const config = {
           pathNot: [
             `^${owner}/`,
             ...sharedPackages.map(
-              (sharedPackage) => `^${sharedPackage}/src/index\\.ts$`,
+              (sharedPackage) => `^${sharedPackage}/src/index\\.(?:ts|mjs)$`,
             ),
             installedPackages,
           ],

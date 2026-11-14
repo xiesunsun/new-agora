@@ -1,14 +1,23 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
 
 const panelDir = "dist/panel";
 const pluginDir = "dist/desktop";
 const desktopAssets = `${pluginDir}/dist`;
+const { version } = JSON.parse(
+  await readFile("plugins/desktop/.codex-plugin/plugin.json", "utf8"),
+);
+const panelDefines = {
+  __VUE_OPTIONS_API__: "true",
+  __VUE_PROD_DEVTOOLS__: "false",
+  __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: "false",
+};
 const html = `<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="agora-version" content="${version}">
 <title>Agora · 文稿工作台</title>
 <link rel="stylesheet" href="/panel.css">
 </head>
@@ -35,19 +44,22 @@ await Promise.all([
     bundle: true,
     minify: true,
     format: "esm",
+    define: panelDefines,
   }),
   build({
     entryPoints: ["apps/panel/src/panel.css"],
     outfile: `${panelDir}/panel.css`,
+    bundle: true,
     minify: true,
   }),
   build({
-    entryPoints: ["apps/panel/src/index.tsx"],
+    entryPoints: ["apps/panel/src/index.ts"],
     outfile: `${desktopAssets}/panel.js`,
     bundle: true,
     minify: true,
     format: "iife",
     globalName: "AgoraPanel",
+    define: panelDefines,
   }),
   build({
     entryPoints: ["plugins/desktop/src/host.ts"],
@@ -55,6 +67,17 @@ await Promise.all([
     bundle: true,
     minify: true,
     format: "esm",
+  }),
+  build({
+    entryPoints: ["apps/service/src/run.ts"],
+    outfile: `${desktopAssets}/service.mjs`,
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: {
+      js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+    },
   }),
   build({
     entryPoints: ["plugins/desktop/src/server.ts"],
@@ -84,6 +107,7 @@ const [css, panel, host] = await Promise.all([
   readFile(`${desktopAssets}/panel.js`, "utf8"),
   readFile(`${desktopAssets}/host.js`, "utf8"),
 ]);
+await cp(panelDir, `${desktopAssets}/browser`, { recursive: true });
 await writeFile(
   `${desktopAssets}/panel.html`,
   html

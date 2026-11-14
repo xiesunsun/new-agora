@@ -1,0 +1,23 @@
+{
+  "manuscript": "../../tests/fixtures/a01/original.md",
+  "worker": {
+    "threadId": "a01-script",
+    "pollMs": 550,
+    "editMs": 650,
+    "rules": [
+      {
+        "quote": "本周完成初稿",
+        "replacement": "周四上午完成初稿"
+      },
+      {
+        "quote": "周五前交付",
+        "replacement": "下周一交付"
+      }
+    ],
+    "results": [
+      {
+        "kind": "rules"
+      }
+    ]
+  }
+}

@@ -2,15 +2,36 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "^startup$",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/scripts/codex-session-start.py\"",
-            "statusMessage": "核对 Agora 工作树",
-            "timeout": 5
+            "command": "python3 -c 'import json, pathlib, subprocess, sys\npayload = {}\ntry:\n    data = sys.stdin.read()\n    payload = json.loads(data)\n    if not isinstance(payload, dict):\n        raise ValueError(\"hook input must be an object\")\n    def git(arg):\n        return subprocess.check_output([\"git\", \"rev-parse\", arg], text=True, stderr=subprocess.DEVNULL, timeout=1).rstrip(\"\\n\")\n    roots = [pathlib.Path(git(\"--git-common-dir\")).resolve().parent, pathlib.Path(git(\"--show-toplevel\"))]\n    script = next(root / \"scripts/agora-task.py\" for root in roots if (root / \"scripts/agora-task.py\").is_file())\n    result = subprocess.run([sys.executable, str(script), \"hook\"], input=data, text=True, capture_output=True, timeout=7)\n    if result.returncode:\n        raise RuntimeError(\"handler failed\")\n    output = json.loads(result.stdout)\n    if not isinstance(output, dict):\n        raise ValueError(\"handler output must be an object\")\nexcept Exception as error:\n    output = {\"systemMessage\": \"Agora hook unavailable (\" + type(error).__name__ + \"). Checks were not completed.\"}\n    if isinstance(payload, dict) and payload.get(\"hook_event_name\") == \"PreToolUse\" and payload.get(\"tool_name\") == \"mcp__codex_apps__github_create_pull_request\":\n        output[\"hookSpecificOutput\"] = {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Agora hook is unavailable. This restricted method remains denied; use gh pr create.\"}\nprint(json.dumps(output))\n'",
+            "timeout": 10
           }
         ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import json, pathlib, subprocess, sys\npayload = {}\ntry:\n    data = sys.stdin.read()\n    payload = json.loads(data)\n    if not isinstance(payload, dict):\n        raise ValueError(\"hook input must be an object\")\n    def git(arg):\n        return subprocess.check_output([\"git\", \"rev-parse\", arg], text=True, stderr=subprocess.DEVNULL, timeout=1).rstrip(\"\\n\")\n    roots = [pathlib.Path(git(\"--git-common-dir\")).resolve().parent, pathlib.Path(git(\"--show-toplevel\"))]\n    script = next(root / \"scripts/agora-task.py\" for root in roots if (root / \"scripts/agora-task.py\").is_file())\n    result = subprocess.run([sys.executable, str(script), \"hook\"], input=data, text=True, capture_output=True, timeout=7)\n    if result.returncode:\n        raise RuntimeError(\"handler failed\")\n    output = json.loads(result.stdout)\n    if not isinstance(output, dict):\n        raise ValueError(\"handler output must be an object\")\nexcept Exception as error:\n    output = {\"systemMessage\": \"Agora hook unavailable (\" + type(error).__name__ + \"). Checks were not completed.\"}\n    if isinstance(payload, dict) and payload.get(\"hook_event_name\") == \"PreToolUse\" and payload.get(\"tool_name\") == \"mcp__codex_apps__github_create_pull_request\":\n        output[\"hookSpecificOutput\"] = {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Agora hook is unavailable. This restricted method remains denied; use gh pr create.\"}\nprint(json.dumps(output))\n'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import json, pathlib, subprocess, sys\npayload = {}\ntry:\n    data = sys.stdin.read()\n    payload = json.loads(data)\n    if not isinstance(payload, dict):\n        raise ValueError(\"hook input must be an object\")\n    def git(arg):\n        return subprocess.check_output([\"git\", \"rev-parse\", arg], text=True, stderr=subprocess.DEVNULL, timeout=1).rstrip(\"\\n\")\n    roots = [pathlib.Path(git(\"--git-common-dir\")).resolve().parent, pathlib.Path(git(\"--show-toplevel\"))]\n    script = next(root / \"scripts/agora-task.py\" for root in roots if (root / \"scripts/agora-task.py\").is_file())\n    result = subprocess.run([sys.executable, str(script), \"hook\"], input=data, text=True, capture_output=True, timeout=7)\n    if result.returncode:\n        raise RuntimeError(\"handler failed\")\n    output = json.loads(result.stdout)\n    if not isinstance(output, dict):\n        raise ValueError(\"handler output must be an object\")\nexcept Exception as error:\n    output = {\"systemMessage\": \"Agora hook unavailable (\" + type(error).__name__ + \"). Checks were not completed.\"}\n    if isinstance(payload, dict) and payload.get(\"hook_event_name\") == \"PreToolUse\" and payload.get(\"tool_name\") == \"mcp__codex_apps__github_create_pull_request\":\n        output[\"hookSpecificOutput\"] = {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Agora hook is unavailable. This restricted method remains denied; use gh pr create.\"}\nprint(json.dumps(output))\n'",
+            "timeout": 10
+          }
+        ],
+        "matcher": "^mcp__codex_apps__github_create_pull_request$"
       }
     ]
   }

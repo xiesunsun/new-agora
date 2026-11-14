@@ -4,7 +4,13 @@
       "command": "/bin/sh",
       "args": ["-c", "exec \"${CODEX_MCP_NODE_PATH:-node}\" ./dist/server.mjs"],
       "cwd": ".",
-      "env_vars": ["PATH", "CODEX_MCP_NODE_PATH", "AGORA_CONNECTION"],
+      "env_vars": [
+        "PATH",
+        "CODEX_MCP_NODE_PATH",
+        "AGORA_CONNECTION",
+        "AGORA_STATE_DIR",
+        "XDG_STATE_HOME"
+      ],
       "tool_timeout_sec": 60
     }
   }
