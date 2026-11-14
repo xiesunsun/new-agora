@@ -158,10 +158,7 @@ test("a service that never becomes ready is stopped and its output is retained",
     "process.stderr.write('waiting fixture\\n'); setInterval(() => {}, 1000); await new Promise(() => {});",
   );
   await rejects(
-    startService(f.fixture, f.document, f.runtime, {
-      env: f.env,
-      timeoutMs: 5000,
-    }),
+    startService(f.fixture, f.document, f.runtime, { env: f.env }),
     /waiting fixture/,
   );
   const pid = Number(await readFile(f.pidPath, "utf8"));
