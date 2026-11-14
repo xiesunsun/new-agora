@@ -5,8 +5,8 @@ import { chromium } from "playwright";
 
 const sdk = `
 export class App {
- constructor() { window.testHost = {app:this,messages:[],roundId:'round-1'}; }
- async callServerTool() { const h=window.testHost;return {structuredContent:{state:{documentId:'doc',documentName:'copy.md',revision:2,draftRevision:0,draft:'正文',comments:[],commentDraft:null,workingBase:{version:1},versions:[{number:1,body:'正文',savedAt:null,parentVersion:null,operationId:null}],round:{phase:'waiting',id:h.roundId,base:'正文',submittedComments:[],sourceDraftRevision:0},applyStatus:null}}}; }
+ constructor() { window.testHost = {app:this,messages:[],requests:[],roundId:'round-1'}; }
+ async callServerTool(request) { const h=window.testHost;h.requests.push(request);return {structuredContent:{state:{documentId:'doc',documentName:'copy.md',revision:2,draftRevision:0,draft:'正文',comments:[],commentDraft:null,workingBase:{version:1},versions:[{number:1,body:'正文',savedAt:null,parentVersion:null,operationId:null}],round:{phase:'waiting',id:h.roundId,base:'正文',submittedComments:[],sourceDraftRevision:0},applyStatus:null}}}; }
  async connect() { window.testHost.connected=true; }
 }
 export class OpenAIExtensions {
@@ -55,7 +55,7 @@ test("desktop wakes each queued generation and retry once and cleans up its moun
   await page.waitForFunction(() => Reflect.get(window, "testHost")?.connected);
   await page.evaluate(() =>
     Reflect.get(window, "testHost").app.ontoolresult({
-      structuredContent: { threadId: "test-thread" },
+      structuredContent: { threadId: "test-thread", projectId: "a".repeat(64) },
     }),
   );
   await page.evaluate(async () => {
@@ -86,6 +86,24 @@ test("desktop wakes each queued generation and retry once and cleans up its moun
   equal(
     await page.evaluate(() => Reflect.get(window, "testHost").messages.length),
     2,
+  );
+  equal(
+    await page.evaluate(() =>
+      Reflect.get(window, "testHost").requests.every(
+        /** @param {{arguments:{expectedProject:string}}} request */
+        (request) => request.arguments.expectedProject === "a".repeat(64),
+      ),
+    ),
+    true,
+  );
+  equal(
+    await page.evaluate(() =>
+      Reflect.get(window, "testHost").messages.every(
+        /** @param {{content:Array<{text:string}>}} message */ (message) =>
+          message.content[0].text.includes("projectId: " + "a".repeat(64)),
+      ),
+    ),
+    true,
   );
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   equal(

@@ -19,5 +19,5 @@
     "tests/**/*",
     "dev/**/*"
   ],
-  "exclude": ["**/dist", "**/node_modules"]
+  "exclude": ["**/dist", "**/node_modules", "apps/panel"]
 }

@@ -1,7 +1,6 @@
 import { equal, notEqual, ok, rejects } from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { access, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
@@ -9,8 +8,9 @@ import { z } from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { startService } from "./support/service.mjs";
+import { createFixture } from "./support/fixture.mjs";
 
-/** @param {import('node:test').TestContext} context @param {string} [config] @param {boolean} [retain] */
+/** @param {import('./support/fixture.mjs').Cleanup} context @param {string} [config] @param {boolean} [retain] */
 async function launch(context, config, retain = false) {
   const child = spawn(
     process.execPath,
@@ -110,8 +110,8 @@ function generation(state) {
 }
 
 test("two configured mocks use isolated manuscripts, workers and real save/version behavior", async (context) => {
-  const root = await mkdtemp(join(tmpdir(), "agora-mock-test-"));
-  context.after(() => rm(root, { recursive: true, force: true }));
+  const resources = await createFixture(context, "agora-mock-test-");
+  const { root } = resources;
   const source = join(root, "source.md");
   const original = "# 文稿\n\n原句。保留句。\n";
   await writeFile(source, original);
@@ -136,7 +136,7 @@ test("two configured mocks use isolated manuscripts, workers and real save/versi
     }),
   );
   const mocks = await Promise.all(
-    configs.map((config) => launch(context, config)),
+    configs.map((config) => launch(resources, config)),
   );
   notEqual(mocks[0].document, mocks[1].document);
   notEqual(mocks[0].runtime, mocks[1].runtime);
@@ -182,8 +182,8 @@ test("two configured mocks use isolated manuscripts, workers and real save/versi
 });
 
 test("configured worker failure reports terminal evidence through the real service", async (context) => {
-  const root = await mkdtemp(join(tmpdir(), "agora-mock-failure-"));
-  context.after(() => rm(root, { recursive: true, force: true }));
+  const resources = await createFixture(context, "agora-mock-failure-");
+  const { root } = resources;
   await writeFile(join(root, "source.md"), "原句。");
   const config = join(root, "failure.json");
   await writeFile(
@@ -200,7 +200,7 @@ test("configured worker failure reports terminal evidence through the real servi
       },
     }),
   );
-  const mock = await launch(context, config);
+  const mock = await launch(resources, config);
   await mock.request(generation(await mock.request()));
   const interrupted = await waitFor(
     mock.request,
@@ -215,8 +215,8 @@ test("configured worker failure reports terminal evidence through the real servi
 });
 
 test("stopping a claimed scripted worker persists a genuine cancelled receipt", async (context) => {
-  const root = await mkdtemp(join(tmpdir(), "agora-mock-stop-"));
-  context.after(() => rm(root, { recursive: true, force: true }));
+  const resources = await createFixture(context, "agora-mock-stop-");
+  const { root } = resources;
   await writeFile(join(root, "source.md"), "原句。");
   const config = join(root, "slow.json");
   await writeFile(
@@ -233,7 +233,7 @@ test("stopping a claimed scripted worker persists a genuine cancelled receipt", 
       },
     }),
   );
-  const mock = await launch(context, config, true);
+  const mock = await launch(resources, config, true);
   await mock.request(generation(await mock.request()));
   const editing = await waitFor(
     mock.request,
@@ -242,7 +242,7 @@ test("stopping a claimed scripted worker persists a genuine cancelled receipt", 
   ok(editing.round?.phase === "editing");
   const executionId = editing.round.executionId;
   await mock.stop();
-  const resumed = await startService(context, mock.document, mock.runtime);
+  const resumed = await startService(resources, mock.document, mock.runtime);
   const recovered = await resumed.request("/api/state");
   equal(recovered.round.phase, "interrupted");
   equal(recovered.round.executionId, executionId);
@@ -252,14 +252,14 @@ test("stopping a claimed scripted worker persists a genuine cancelled receipt", 
 });
 
 test("desktop terminal tool reports failed and cancelled claimed executions", async (context) => {
-  const root = await mkdtemp(join(tmpdir(), "agora-desktop-finish-"));
-  context.after(() => rm(root, { recursive: true, force: true }));
+  const resources = await createFixture(context, "agora-desktop-finish-");
+  const { root } = resources;
   const document = join(root, "source.md");
   const runtime = join(root, "runtime");
   await writeFile(document, "原句。");
-  const service = await startService(context, document, runtime);
+  const service = await startService(resources, document, runtime);
   const mcp = new Client({ name: "finish-test", version: "0.1.0" });
-  context.after(() => mcp.close());
+  resources.after(() => mcp.close());
   await mcp.connect(
     new StdioClientTransport({
       command: process.execPath,

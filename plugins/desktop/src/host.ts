@@ -15,7 +15,10 @@ const app = new App(
   {},
 );
 const extension = new OpenAIExtensions(app);
-const openSchema = z.object({ threadId: z.string().min(1) });
+const openSchema = z.object({
+  threadId: z.string().min(1),
+  projectId: z.string().optional(),
+});
 const replySchema = z.object({ state: viewSchema });
 const errorSchema = z.object({ error: z.string() });
 const warning = document.createElement("p");
@@ -28,10 +31,18 @@ function displayWarning(message: string) {
   warning.hidden = !message;
 }
 
-async function panelRequest(expectedThread: string, command?: PanelCommand) {
+async function panelRequest(
+  expectedThread: string,
+  expectedProject?: string,
+  command?: PanelCommand,
+) {
   const result = await app.callServerTool({
     name: "agora_panel",
-    arguments: { expectedThread, ...(command ? { command } : {}) },
+    arguments: {
+      expectedThread,
+      ...(expectedProject ? { expectedProject } : {}),
+      ...(command ? { command } : {}),
+    },
   });
   if (result.isError) {
     const problem = errorSchema.safeParse(result.structuredContent);
@@ -40,9 +51,8 @@ async function panelRequest(expectedThread: string, command?: PanelCommand) {
   return replySchema.parse(result.structuredContent).state;
 }
 
-async function notifyCodex() {
-  const text =
-    "Agora 文稿工作台提交了改稿请求。请调用 agora_claim_next。只有领取成功后才编辑返回的待审稿，然后调用 agora_submit_candidate 交回结果。";
+async function notifyCodex(projectId?: string) {
+  const text = `Agora 文稿工作台提交了改稿请求。请调用 agora_claim_next${projectId ? `，传入 projectId: ${projectId}` : ""}。只有领取成功后才编辑返回的待审稿，然后用领取结果的 projectId 和 executionId 调用 agora_submit_candidate 交回结果。`;
   const message = {
     role: "user" as const,
     content: [{ type: "text" as const, text }],
@@ -75,20 +85,20 @@ app.ontoolresult = (result) => {
   const opening = openSchema.safeParse(result.structuredContent);
   if (!opening.success) return;
 
-  const { threadId } = opening.data;
+  const { threadId, projectId } = opening.data;
   let notifiedRoundId: string | undefined;
   mounted = true;
   const unmount = AgoraPanel.mountPanel({
-    getState: () => panelRequest(threadId),
+    getState: () => panelRequest(threadId, projectId),
     async run(command) {
-      const state = await panelRequest(threadId, command);
+      const state = await panelRequest(threadId, projectId, command);
       if (
         (command.action === "generate" || command.action === "retry") &&
         state.round?.phase === "waiting" &&
         notifiedRoundId !== state.round.id
       ) {
         notifiedRoundId = state.round.id;
-        void notifyCodex();
+        void notifyCodex(projectId);
       }
       return state;
     },

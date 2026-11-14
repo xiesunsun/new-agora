@@ -2,26 +2,27 @@ import { deepStrictEqual, equal, ok, rejects } from "node:assert/strict";
 import {
   chmod,
   mkdir,
-  mkdtemp,
   readFile,
   realpath,
-  rm,
+  rename,
+  symlink,
+  unlink,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { startService } from "./support/service.mjs";
+import { createFixture } from "./support/fixture.mjs";
 
 /** @param {import("node:test").TestContext} context @param {string} [body] */
 async function setup(context, body = "# 稿件\n\n第一句。第二句。\n") {
-  const root = await mkdtemp(join(tmpdir(), "agora-manuscript-service-"));
-  context.after(() => rm(root, { recursive: true, force: true }));
+  const resources = await createFixture(context, "agora-manuscript-service-");
+  const { root } = resources;
   const file = join(root, "copy.md");
   await writeFile(file, body);
   const runtime = join(root, "runtime");
-  const service = await startService(context, file, runtime);
+  const service = await startService(resources, file, runtime);
   const state = () => service.request("/api/state");
   /** @param {object} command */
   const panel = (command) => service.request("/api/panel", command);
@@ -51,6 +52,7 @@ async function setup(context, body = "# 稿件\n\n第一句。第二句。\n") {
   }
   return {
     ...service,
+    resources,
     root,
     file,
     runtime,
@@ -81,7 +83,7 @@ test("manuscript service refuses undecided apply, preserves round identity on re
   equal(review.round.base, s.body);
   const changes = review.round.changes;
   await s.stop();
-  const reopened = await startService(context, s.file, s.runtime);
+  const reopened = await startService(s.resources, s.file, s.runtime);
   review = await reopened.request("/api/state");
   deepStrictEqual(review.round.changes, changes);
   for (const change of changes)
@@ -231,10 +233,11 @@ test(
     const s = await setup(context);
     const dir = join(s.root, "locked");
     await mkdir(dir);
+    s.resources.after(() => chmod(dir, 0o700));
     const target = join(dir, "copy.md");
     await writeFile(target, s.body);
     const service = await startService(
-      context,
+      s.resources,
       target,
       join(s.root, "locked-runtime"),
     );
@@ -284,6 +287,64 @@ test(
   },
 );
 
+test(
+  "operation recheck rejects another target after an original parent becomes a symlink",
+  { skip: process.getuid?.() === 0 },
+  async (context) => {
+    const s = await setup(context);
+    const directory = join(s.root, "original");
+    const moved = join(s.root, "moved");
+    const other = join(s.root, "other");
+    await mkdir(directory);
+    await mkdir(other);
+    s.resources.after(() => chmod(directory, 0o700));
+    const target = join(directory, "copy.md");
+    await writeFile(target, s.body);
+    const service = await startService(
+      s.resources,
+      target,
+      join(s.root, "recheck-runtime"),
+    );
+    const initial = await service.request("/api/state");
+    const saved = await service.request("/api/panel", {
+      action: "save",
+      revision: initial.revision,
+      draft: s.body + "新增。",
+      comments: [],
+    });
+    await chmod(directory, 0o500);
+    const pending = await service.request("/api/panel", {
+      action: "apply",
+      revision: saved.revision,
+      operationId: "pending-before-parent-move",
+      preview: saved.draft,
+    });
+    equal(pending.applyStatus.phase, "checking");
+    await chmod(directory, 0o700);
+    await rename(directory, moved);
+    await writeFile(join(other, "copy.md"), saved.draft);
+    await symlink(other, directory);
+    const checked = await service.request("/api/panel", {
+      action: "recheck",
+      operationId: pending.applyStatus.operationId,
+    });
+    equal(checked.applyStatus.phase, "checking");
+    equal(checked.draft, saved.draft);
+    deepStrictEqual(checked.versions, initial.versions);
+    equal(await readFile(join(moved, "copy.md"), "utf8"), s.body);
+    equal(await readFile(join(other, "copy.md"), "utf8"), saved.draft);
+    await unlink(directory);
+    await rename(moved, directory);
+    const restored = await service.request("/api/panel", {
+      action: "recheck",
+      operationId: pending.applyStatus.operationId,
+    });
+    equal(restored.applyStatus.phase, "not-written");
+    deepStrictEqual(restored.versions, initial.versions);
+    equal(await readFile(target, "utf8"), s.body);
+  },
+);
+
 test("adoption persistence failure preserves draft, comments and version lineage", async (context) => {
   const s = await setup(context);
   const initial = await s.state();
@@ -294,7 +355,7 @@ test("adoption persistence failure preserves draft, comments and version lineage
     comments: [],
   });
   const db = new DatabaseSync(join(s.runtime, "document.sqlite"));
-  context.after(() => db.close());
+  s.resources.after(() => db.close());
   db.exec(
     "CREATE TRIGGER reject_update BEFORE UPDATE ON document BEGIN SELECT RAISE(FAIL, 'persistence failure'); END",
   );
@@ -341,7 +402,7 @@ test("legacy persisted review IDs and unknown timestamps survive validated migra
   };
   db.prepare("UPDATE document SET body = ?").run(JSON.stringify(old));
   db.close();
-  const reopened = await startService(context, s.file, s.runtime);
+  const reopened = await startService(s.resources, s.file, s.runtime);
   const view = await reopened.request("/api/state");
   equal(view.versions[0].savedAt, null);
   deepStrictEqual(view.round.changes, old.round.changes);
@@ -439,7 +500,7 @@ test("restart preserves unknown execution gate and only its own terminal report 
   await s.generate();
   const claim = await s.worker({ action: "claim" });
   await s.stop();
-  const restarted = await startService(context, s.file, s.runtime);
+  const restarted = await startService(s.resources, s.file, s.runtime);
   const state = await restarted.request("/api/state");
   equal(state.round.phase, "interrupted");
   equal(state.round.executionEnded, false);
@@ -588,16 +649,16 @@ test(
   "recheck retains unrelated disk evidence and registers late matching readback only once",
   { skip: process.getuid?.() === 0 },
   async (context) => {
-    const root = await mkdtemp(join(tmpdir(), "agora-manuscript-recheck-"));
+    const resources = await createFixture(context, "agora-manuscript-recheck-");
+    const { root } = resources;
     const directory = join(root, "manuscript");
     await mkdir(directory);
     const file = join(directory, "copy.md");
     await writeFile(file, "原始稿件");
-    context.after(async () => {
+    resources.after(async () => {
       await chmod(directory, 0o700);
-      await rm(root, { recursive: true, force: true });
     });
-    const s = await startService(context, file, join(root, "runtime"));
+    const s = await startService(resources, file, join(root, "runtime"));
     const original = await s.request("/api/state");
     const saved = await s.request("/api/panel", {
       action: "save",
@@ -707,7 +768,7 @@ test("legacy successful apply receipts recognize exact replay with unknown origi
   };
   db.prepare("UPDATE document SET body = ?").run(JSON.stringify(old));
   db.close();
-  const restarted = await startService(context, s.file, s.runtime);
+  const restarted = await startService(s.resources, s.file, s.runtime);
   const replay = await restarted.request("/api/panel", {
     action: "apply",
     revision: 6,
@@ -771,7 +832,7 @@ test("legacy annotation focus metadata is normalized before a leftward anchor mo
   );
   deepStrictEqual(await s.state(), moved);
   await s.stop();
-  const reopened = await startService(context, s.file, s.runtime);
+  const reopened = await startService(s.resources, s.file, s.runtime);
   const restored = await reopened.request("/api/state");
   deepStrictEqual(restored.comments, moved.comments);
   equal(restored.draft, "quote suffix");

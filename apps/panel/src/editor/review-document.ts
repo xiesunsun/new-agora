@@ -1,13 +1,6 @@
 import type { Change } from "../../../../packages/contracts/src/index.js";
-export interface ManuscriptBlock {
-  raw: string;
-  from: number;
-  end: number;
-  prefix: string;
-  text: string;
-  tag: "h1" | "h2" | "p";
-  subtitle: boolean;
-}
+import { manuscriptBlocks as parts } from "./markdown-syntax.js";
+import type { ManuscriptBlock } from "./markdown-syntax.js";
 export interface ReviewProjectionInput {
   base: string;
   candidate: string;
@@ -27,9 +20,17 @@ interface Lane {
   text: string;
   spans: Span[];
   blocks: ManuscriptBlock[];
+  reading: ReviewReading;
+}
+export interface ReviewReading {
+  source: string;
+  marks: { from: number; end: number; id: string; mark: Mark }[];
 }
 export interface LaneBlock {
   raw: string;
+  from: number;
+  end: number;
+  reading: ReviewReading;
   format: Pick<ManuscriptBlock, "tag" | "subtitle">;
   runs: { tag: "text" | "edit"; id?: string; mark?: Mark; text: string }[];
 }
@@ -47,7 +48,15 @@ interface Window {
 }
 type Source = { start: number; end: number };
 export type ReviewPart =
-  { tag: "context"; text: string; visible: string } | Comparison;
+  | {
+      tag: "context";
+      text: string;
+      visible: string;
+      reading: ReviewReading;
+      from: number;
+      end: number;
+    }
+  | Comparison;
 export type Comparison = {
   key: string;
   source: Source;
@@ -73,24 +82,6 @@ export type ReviewBlock =
   | { tag: "structural"; comparison: Comparison };
 import { applyChanges } from "../../../../packages/text/src/index.js";
 import { reviewRuns } from "./review-runs.js";
-
-export function parts(text: string): ManuscriptBlock[] {
-  let from = 0;
-  return text.split("\n\n").map((raw, index) => {
-    const prefix = raw.match(/^(#{1,2} |> )/)?.[0] ?? "";
-    const block: ManuscriptBlock = {
-      raw,
-      from,
-      end: from + raw.length,
-      prefix,
-      text: raw.slice(prefix.length),
-      tag: prefix === "# " ? "h1" : prefix === "## " ? "h2" : "p",
-      subtitle: index === 1 && text.startsWith("# ") && !prefix,
-    };
-    from += raw.length + 2;
-    return block;
-  });
-}
 
 function laneDocument(
   review: ReviewProjectionInput,
@@ -155,7 +146,19 @@ function laneDocument(
       from: offset,
       end: offset + tail.length,
     });
-  return { text, spans, blocks: parts(text) };
+  return {
+    text,
+    spans,
+    blocks: parts(text),
+    reading: {
+      source: text,
+      marks: spans.flatMap((span) =>
+        span.tag === "edit" && span.id && span.mark
+          ? [{ from: span.from, end: span.end, id: span.id, mark: span.mark }]
+          : [],
+      ),
+    },
+  };
 }
 
 function projectOffset(
@@ -215,6 +218,9 @@ function laneSlice(
     }
     result.push({
       raw: lane.text.slice(start, stop),
+      from: start,
+      end: stop,
+      reading: lane.reading,
       format: { tag: block.tag, subtitle: block.subtitle },
       runs,
     });
@@ -386,6 +392,7 @@ export function reviewDocument(
     let last = blockAt(Math.max(change.start, change.end - 1));
     const block = sourceBlocks[first];
     const structural =
+      Boolean(block.structural) ||
       laneFormat(original, kept, change.start) !==
         laneFormat(proposal, proposed, change.start) ||
       first !== last ||
@@ -509,6 +516,13 @@ export function reviewDocument(
       paragraph(index, cursor, stop, {
         tag: "context",
         text,
+        reading: proposal.reading,
+        from: projectOffset(
+          review,
+          proposed,
+          Math.max(cursor, block.from + block.prefix.length),
+        ),
+        end: projectOffset(review, proposed, Math.min(stop, block.end)),
         visible: review.base.slice(
           Math.max(cursor, block.from + block.prefix.length),
           Math.min(stop, block.end),

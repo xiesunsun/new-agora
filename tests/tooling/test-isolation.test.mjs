@@ -6,9 +6,10 @@ import {
   mkdir,
   readFile,
   readdir,
+  symlink,
   writeFile,
 } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createManagedRun } from "../../dev/runtime/src/index.mjs";
@@ -24,7 +25,7 @@ const cleaner = fileURLToPath(
   new URL("../../scripts/clean-development.mjs", import.meta.url),
 );
 
-/** @param {import('node:test').TestContext} context @param {string} body @param {boolean} [stateInside] @param {{git?: boolean, interrupt?: boolean, uncertainSignal?: boolean}} [options] */
+/** @param {import('node:test').TestContext} context @param {string} body @param {boolean} [stateInside] @param {{git?: boolean, interrupt?: boolean, uncertainSignal?: boolean, files?: Record<string,string>, browser?: boolean, link?: boolean, namePattern?: string}} [options] */
 async function execute(context, body, stateInside = false, options = {}) {
   const run = await createManagedRun("test");
   const scope = createTestProcessScope(run.root, process.env);
@@ -70,6 +71,12 @@ async function execute(context, body, stateInside = false, options = {}) {
     join(repo, "tests/example.test.mjs"),
     `import { test } from 'node:test';\ntest('green assertions', async () => { ${body} });\n`,
   );
+  for (const [name, source] of Object.entries(options.files ?? {})) {
+    await mkdir(dirname(join(repo, name)), { recursive: true });
+    await writeFile(join(repo, name), source);
+  }
+  if (options.link)
+    await symlink("../source.md", join(repo, "tests/linked.test.mjs"));
   if (options.git !== false) execFileSync("git", ["add", "."], { cwd: repo });
   await writeFile(join(repo, "source.md"), "user's uncommitted source");
   /** @type {NodeJS.ProcessEnv} */
@@ -82,6 +89,9 @@ async function execute(context, body, stateInside = false, options = {}) {
     AGORA_FIXTURE_READY: ready,
   };
   delete env.NODE_TEST_CONTEXT;
+  delete env.AGORA_TEST_NAME_PATTERN;
+  if (options.namePattern !== undefined)
+    env.AGORA_TEST_NAME_PATTERN = options.namePattern;
   let entry = runner;
   if (options.uncertainSignal) {
     const clone = join(run.root, "runner");
@@ -103,11 +113,15 @@ async function execute(context, body, stateInside = false, options = {}) {
        export function signalTestProcesses() { return { uncertain: ['injected signal identity uncertainty'] }; }`,
     );
   }
-  const child = spawn(process.execPath, [entry], {
-    cwd: repo,
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawn(
+    process.execPath,
+    [entry, ...(options.browser ? ["browser"] : [])],
+    {
+      cwd: repo,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   let output = "";
   child.stdout.on("data", (chunk) => {
     output += String(chunk);
@@ -149,6 +163,108 @@ test("a clean run releases its resources and preserves accepted dirty files", as
     "user's uncommitted source",
   );
   equal((await readdir(join(result.state, "runs"))).length, 0);
+});
+
+test("a focused runner selects matching names and preserves resource checks", async (context) => {
+  const result = await execute(
+    context,
+    "throw new Error('unselected test must not run')",
+    false,
+    {
+      namePattern: "focused success marker",
+      files: {
+        "tests/browser/focus.test.mjs":
+          "import {test} from 'node:test'; test('focused success marker',()=>{});",
+      },
+    },
+  );
+  equal(result.status, 0, result.output);
+  match(result.output, /Focused test pattern/);
+  equal((await readdir(join(result.state, "runs"))).length, 0);
+  equal(
+    await readFile(join(result.repo, "source.md"), "utf8"),
+    "user's uncommitted source",
+  );
+});
+
+test("a focused runner rejects an invalid name pattern", async (context) => {
+  const result = await execute(context, "", false, { namePattern: "[" });
+  equal(result.status, 1, result.output);
+  match(result.output, /Invalid regular expression/);
+});
+
+test("a focused runner with no matching names fails and keeps its selection evidence", async (context) => {
+  const result = await execute(context, "", false, {
+    namePattern: "does-not-match-any-test",
+  });
+  equal(result.status, 1, result.output);
+  match(result.output, /No tests matched AGORA_TEST_NAME_PATTERN/);
+  const [name] = await readdir(join(result.state, "runs"));
+  const selection = JSON.parse(
+    await readFile(
+      join(result.state, "runs", name, "test-selection.json"),
+      "utf8",
+    ),
+  );
+  equal(selection.namePattern, "does-not-match-any-test");
+});
+
+test("the full runner discovers a failing test two directories below tests", async (context) => {
+  const result = await execute(context, "", false, {
+    files: {
+      "tests/service/recovery/nested.test.mjs":
+        "import {test} from 'node:test'; test('nested failure marker',()=>{throw new Error('nested failure marker')});",
+    },
+  });
+  equal(result.status, 1, result.output);
+  match(result.output, /nested failure marker/);
+});
+
+test("the browser runner recursively discovers its tests and excludes other directories", async (context) => {
+  const result = await execute(
+    context,
+    "throw new Error('non-browser must not run')",
+    false,
+    {
+      browser: true,
+      files: {
+        "tests/browser/editor/recovery/nested.test.mjs":
+          "import {test} from 'node:test'; test('nested browser marker',()=>{throw new Error('nested browser marker')});",
+        "tests/service/other.test.mjs":
+          "throw new Error('service must not run');",
+      },
+    },
+  );
+  equal(result.status, 1, result.output);
+  match(result.output, /nested browser marker/);
+  equal(
+    result.output.includes("non-browser must not run"),
+    false,
+    result.output,
+  );
+  equal(result.output.includes("service must not run"), false, result.output);
+});
+
+test("an empty browser selection fails without falling back to all tests", async (context) => {
+  const result = await execute(
+    context,
+    "throw new Error('non-browser must not run')",
+    false,
+    { browser: true },
+  );
+  equal(result.status, 1, result.output);
+  match(result.output, /No test files found in tests\/browser/);
+  equal(
+    result.output.includes("non-browser must not run"),
+    false,
+    result.output,
+  );
+});
+
+test("test discovery refuses symlinks instead of skipping or following them", async (context) => {
+  const result = await execute(context, "", false, { link: true });
+  equal(result.status, 1, result.output);
+  match(result.output, /Test discovery refuses symlink.*linked.test.mjs/);
 });
 
 test("green assertions cannot hide repository mutation", async (context) => {

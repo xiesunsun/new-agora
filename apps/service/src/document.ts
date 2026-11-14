@@ -91,6 +91,7 @@ export class DocumentService {
     private readonly db: DatabaseSync,
     originalPath: string,
     private readonly runtimeDir: string,
+    resetThreadBinding = false,
   ) {
     db.exec(
       "CREATE TABLE IF NOT EXISTS document (id INTEGER PRIMARY KEY CHECK (id = 1), body TEXT NOT NULL) STRICT",
@@ -116,6 +117,8 @@ export class DocumentService {
           ],
         });
       }
+      if (resetThreadBinding && this.state.threadId !== null)
+        this.persist({ ...this.state, threadId: null });
       this.reconcileApply(false);
       return;
     }
@@ -520,7 +523,7 @@ export class DocumentService {
     );
     if (workingBase?.body === preview)
       throw new CommandError(409, "工作稿还没有需要保存的修改。");
-    const before = readMarkdown(s.originalPath);
+    const before = this.readOriginal();
     if (before !== this.latestVersion().body)
       throw new CommandError(409, "原文件已经变动，写入已停止。");
     this.update({
@@ -546,10 +549,10 @@ export class DocumentService {
     if (!pending) return;
     let actual: string;
     try {
-      actual = readMarkdown(s.originalPath);
+      actual = this.readOriginal();
       if (write && actual === pending.before && actual !== pending.preview) {
         replaceMarkdown(s.originalPath, pending.before, pending.preview);
-        actual = readMarkdown(s.originalPath);
+        actual = this.readOriginal();
       }
     } catch {
       return;
@@ -625,6 +628,13 @@ export class DocumentService {
         },
       ],
     });
+  }
+
+  private readOriginal(): string {
+    const path = this.state.originalPath;
+    if (realpathSync(path) !== path)
+      throw new CommandError(409, "原文件路径已经变动，写入已停止。");
+    return readMarkdown(path);
   }
 
   private expectThread(threadId: string): void {

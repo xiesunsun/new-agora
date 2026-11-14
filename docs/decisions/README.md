@@ -22,6 +22,8 @@ Codex 用原生工具改待审 Markdown。Agora 读回结果，和本轮底稿�
 
 ## 原型接入
 
+[原生编辑与 Markdown 源码](markdown-editor-source.md)说明成熟编辑内核、源码投影、恢复与完整 Markdown 审阅的取舍。具体支持范围由面板模块维护。
+
 [Ink 界面与 mock 的接入边界](ink-integration.md)记录正式服务、界面与开发场景的分工。
 
 ## 仓库约束

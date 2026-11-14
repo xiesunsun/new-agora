@@ -9,12 +9,13 @@ import type {
   DestructiveAction,
   PanelController,
 } from "./controller.js";
-import { parts, reviewDocument } from "./review-document.js";
+import { reviewDocument } from "./review-document.js";
+import { manuscriptBlocks as parts } from "./markdown-syntax.js";
+import type { ManuscriptBlock } from "./markdown-syntax.js";
 import type {
   Comparison,
   Decision,
   LaneBlock,
-  ManuscriptBlock,
   ReviewBlock,
 } from "./review-document.js";
 import { orbitLayout } from "./orbit-layout.js";
@@ -23,6 +24,16 @@ import { choosePenPosition } from "./pen-placement.js";
 import type { Bounds } from "./pen-placement.js";
 import { markup } from "./markup.js";
 import { editExactText, editorOffset, textareaText } from "./exact-text.js";
+import { parseMarkdown, renderMarkdown } from "./markdown.js";
+import { createManuscript, unsupportedSource } from "./manuscript.js";
+import type {
+  Manuscript,
+  ManuscriptMapping,
+  ManuscriptNote,
+} from "./manuscript.js";
+import { createReviewReading } from "./review-view.js";
+import type { RichReviewReading } from "./review-view.js";
+import type { ReviewReading } from "./review-document.js";
 
 type Block = ManuscriptBlock & { node?: HTMLElement; wrapper?: HTMLElement };
 type FieldSelection = [number, number, "forward" | "backward" | "none"];
@@ -38,6 +49,7 @@ type Bookmark = {
   note: string | null;
   selected: Anchor | null;
   review: string | null;
+  sourceSelection: [number, number] | null;
 };
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -61,29 +73,31 @@ function action(
   node.addEventListener("click", run);
   return node;
 }
-function icon(name: "pen" | "tab") {
+const iconPaths = {
+  pen: ["M4 16l1.5-5L13 3.5 17 7l-7.5 7.5L4 16Z", "M11.5 5l4 4M5.5 11l4 3.5"],
+  tab: ["M3 2h8l4 4v13H3Z", "M11 2v4h4M6 10h6M6 13h4"],
+  stop: ["M6 6h8v8H6Z"],
+  exit: ["M8 4H4v12h4", "M11 6l5 4-5 4M7 10h9"],
+  checking: ["M16 10a6 6 0 1 1-6-6"],
+  retry: ["M15 6a6 6 0 1 0 1 7M15 3v4h-4"],
+};
+function icon(name: keyof typeof iconPaths) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", name === "tab" ? "0 0 18 21" : "0 0 20 20");
   svg.setAttribute("aria-hidden", "true");
-  svg.classList.add(name === "pen" ? "pen-icon" : "note-tab-svg");
-  const path = document.createElementNS(svg.namespaceURI, "path");
-  path.setAttribute(
-    "d",
+  svg.classList.add(
     name === "pen"
-      ? "M4 16l1.5-5L13 3.5 17 7l-7.5 7.5L4 16Z M11.5 5l4 4M5.5 11l4 3.5"
-      : "M3 2h8l4 4v13H3Z M11 2v4h4M6 10h6M6 13h4",
+      ? "pen-icon"
+      : name === "tab"
+        ? "note-tab-svg"
+        : "control-icon",
   );
-  svg.append(path);
+  for (const d of iconPaths[name]) {
+    const path = document.createElementNS(svg.namespaceURI, "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
   return svg;
-}
-export function supportsProse(text: string) {
-  return (
-    !/[\r\uFEFF\t]/.test(text) &&
-    !/(^|\n)(?:\s*[-*+] |\s*\d+[.)] |\s*```|\s*~~~|\s*\| |\s{4}|#{3,6} |\s*<|\[.+\]:)/.test(
-      text,
-    ) &&
-    !/[`*_[\]\\<>]|!\[/.test(text)
-  );
 }
 export function mountEditor(root: HTMLElement, controller: PanelController) {
   root.innerHTML = markup;
@@ -125,6 +139,22 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     focusedNoteId: string | null = null,
     noteGroup: string[] = [],
     selected: Anchor | null = null;
+  let markdown: ManuscriptMapping | null = null;
+  const reviewReadings = new Map<ReviewReading, RichReviewReading>();
+  let confirmedHead: number | null = null;
+  let working: Manuscript | null = null;
+  let workingHost: HTMLDivElement | null = null;
+  let workingNote: ManuscriptNote | null = null;
+  let workingBookmark: Anchor | null = null;
+  let disposed = false;
+  const workingParking = element("div", undefined, "manuscript-parking");
+  workingParking.hidden = true;
+  manuscript.after(workingParking);
+  const editorNotice = element("div", undefined, "editor-notice");
+  editorNotice.hidden = true;
+  editorNotice.setAttribute("role", "status");
+  manuscript.before(editorNotice);
+  let editingSource = false;
   let renderKey = "",
     composing = false,
     reveal: "closed" | "peek" | "pinned" = "closed",
@@ -189,6 +219,112 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
           state.input?.comments.find((value) => value.id === noteId) ??
           null)
       : null;
+  }
+  const richWorking = () =>
+    Boolean(
+      working &&
+      workingHost?.parentElement === manuscript &&
+      !historical() &&
+      !review() &&
+      !editingSource,
+    );
+  function inputCommand(operation: () => unknown | Promise<unknown>) {
+    run(
+      working ? working.settled(operation) : Promise.resolve().then(operation),
+    );
+  }
+  function renderWorking(body: string) {
+    if (!working) {
+      workingHost = element("div", undefined, "manuscript-editor block");
+      manuscript.replaceChildren(workingHost);
+      working = createManuscript(workingHost, {
+        source: body,
+        publish(next) {
+          if (disposed || !working) return;
+          markdown = working.mapping;
+          blocks = markdown.blocks;
+          renderKey = bodyKey(next);
+          controller.editBody(next);
+          selected = null;
+          selectionHost.hidden = true;
+          scheduleGeometry();
+        },
+        ready() {
+          if (disposed || !richWorking() || !working) return;
+          markdown = working.mapping;
+          blocks = markdown.blocks;
+          scheduleGeometry();
+        },
+        settle() {
+          if (!disposed) {
+            refreshSelection();
+            scheduleGeometry();
+          }
+        },
+        report(message) {
+          if (disposed) return;
+          editorNotice.hidden = !message;
+          editorNotice.replaceChildren();
+          if (!message) return;
+          editorNotice.append(element("span", message));
+          if (working?.nativeRoot)
+            editorNotice.append(
+              action("撤销最近编辑", "撤销最近编辑", () => working?.undo()),
+            );
+          else
+            editorNotice.append(
+              action("编辑 Markdown 源码", "编辑源码", () => {
+                editingSource = true;
+                renderKey = "";
+                render();
+              }),
+            );
+          if (working?.recoverySource) {
+            const details = element("details"),
+              summary = element("summary", "查看可恢复的 Markdown"),
+              field = element("textarea");
+            field.readOnly = true;
+            field.setAttribute("aria-label", "待恢复的 Markdown");
+            field.value = working.recoverySource;
+            details.append(
+              summary,
+              element("p", "当前编辑仍保留在这里，尚未写回原文件。"),
+              field,
+            );
+            editorNotice.append(details);
+          }
+        },
+      });
+    }
+    if (workingHost!.parentElement !== manuscript)
+      manuscript.replaceChildren(workingHost!);
+    const note = currentNote();
+    const key = state.input?.commentDraft
+      ? `entry:${state.input.commentDraft.id}`
+      : noteId && note && "resolved" in note
+        ? `peek:${noteId}:${note.instruction}:${note.resolved}:${noteGroup.join(",")}`
+        : null;
+    if (!key || !note) workingNote = null;
+    else if (workingNote?.key !== key)
+      workingNote = {
+        key,
+        anchor: note,
+        dom: state.input?.commentDraft
+          ? noteEntry(state.input.commentDraft)
+          : notePeek(note as Comment),
+      };
+    else workingNote.anchor = note;
+    working.sync(body, {
+      kind: "working",
+      editable: editable(),
+      note: workingNote,
+    });
+    markdown = working.mapping;
+    blocks = markdown.blocks;
+    paper.classList.remove("view-history");
+    manuscript.setAttribute("aria-busy", String(state.busy > 0));
+    selectionHost.hidden = true;
+    scheduleGeometry();
   }
   function textOffset(
     node: HTMLElement,
@@ -278,6 +414,7 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
   }
   function textRange(anchor: Anchor & { resolved?: boolean }): Range | null {
     if (anchor.resolved === false || historical() || review()) return null;
+    if (markdown) return markdown.rangeFor(anchor.start, anchor.end);
     const first = blocks.find(
       (block) =>
         anchor.start >= block.from + block.prefix.length &&
@@ -303,6 +440,17 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
   }
   function captureSelection(): Anchor | null {
     if (locked() || state.input?.commentDraft) return null;
+    if (richWorking()) {
+      const selection = window.getSelection();
+      if (
+        working!.interacting ||
+        !selection?.anchorNode ||
+        !working!.nativeRoot?.contains(selection.anchorNode) ||
+        !working!.nativeRoot?.contains(document.activeElement)
+      )
+        return null;
+      return working!.selection();
+    }
     const fallback =
       manuscript.querySelector<HTMLTextAreaElement>(".exact-editor");
     if (fallback && fallback.selectionStart !== fallback.selectionEnd) {
@@ -325,15 +473,19 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
         block.node?.contains(range.startContainer),
       ),
       last = blocks.find((block) => block.node?.contains(range.endContainer));
-    if (!first?.node || !last?.node || !state.input) return null;
-    let start =
-        first.from +
-        first.prefix.length +
-        textOffset(first.node, range.startContainer, range.startOffset),
-      end =
-        last.from +
-        last.prefix.length +
-        textOffset(last.node, range.endContainer, range.endOffset);
+    if (!state.input || (!markdown && (!first?.node || !last?.node)))
+      return null;
+    let start = markdown
+        ? markdown.sourcePoint(range.startContainer, range.startOffset, "start")
+        : first!.from +
+          first!.prefix.length +
+          textOffset(first!.node!, range.startContainer, range.startOffset),
+      end = markdown
+        ? markdown.sourcePoint(range.endContainer, range.endOffset, "end")
+        : last!.from +
+          last!.prefix.length +
+          textOffset(last!.node!, range.endContainer, range.endOffset);
+    if (start === null || end === null) return null;
     const raw = state.input.draft.slice(start, end);
     start += raw.length - raw.trimStart().length;
     end -= raw.length - raw.trimEnd().length;
@@ -354,6 +506,24 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
       anchor.focusOffset >= anchor.start && anchor.focusOffset <= anchor.end
         ? anchor.focusOffset
         : anchor.end;
+    if (markdown) {
+      const point = markdown.pointAt(
+        offset,
+        anchor.direction === "backward" ? "start" : "end",
+      );
+      if (!point) return { offset, rect: null };
+      const range = document.createRange();
+      range.setStart(...point);
+      range.collapse(true);
+      const fragments = rangeFragments(textRange(anchor));
+      return {
+        offset,
+        rect:
+          [...range.getClientRects()].find((rect) => rect.height > 0) ??
+          (anchor.direction === "backward" ? fragments[0] : fragments.at(-1)) ??
+          null,
+      };
+    }
     const block = blocks.find(
       (value) => offset >= value.from && offset <= value.end,
     );
@@ -378,6 +548,46 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
   }
   function positionSelection() {
     const host = selectionHost;
+    if (richWorking()) {
+      const endpoint = selected ? selectionEndpoint(selected).rect : null;
+      if (
+        !selected ||
+        locked() ||
+        !host.firstChild ||
+        working!.interacting ||
+        !endpoint ||
+        endpoint.bottom < 8 ||
+        endpoint.top > innerHeight - 8
+      ) {
+        host.hidden = true;
+        return;
+      }
+      const origin = paper.getBoundingClientRect();
+      const left = Math.min(
+        innerWidth - 52,
+        manuscript.getBoundingClientRect().right + 6,
+      );
+      let top = endpoint.top - 8;
+      const obstacles = [...root.querySelectorAll(".note-node,#dock button")]
+        .map((node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width && rect.height);
+      for (const rect of obstacles.sort((a, b) => a.top - b.top))
+        if (
+          left < rect.right + 4 &&
+          left + 44 > rect.left - 4 &&
+          top < rect.bottom + 4 &&
+          top + 44 > rect.top - 4
+        )
+          top = rect.bottom + 4;
+      if (top + 44 > innerHeight - 8) {
+        host.hidden = true;
+        return;
+      }
+      host.style.left = `${left - origin.left}px`;
+      host.style.top = `${top - origin.top}px`;
+      host.hidden = false;
+      return;
+    }
     if (!selected || locked() || !host.firstChild) {
       host.hidden = true;
       return;
@@ -500,10 +710,21 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     if (
       dialog.open ||
       composing ||
-      document.activeElement?.closest(".note-entry")
+      document.activeElement?.closest(
+        ".note-entry,.note-peek,.milkdown-link-edit,.milkdown-link-preview",
+      )
     )
       return;
     const selection = captureSelection();
+    const sourceAction = manuscript.querySelector<HTMLButtonElement>(
+      "[data-source-comment]",
+    );
+    if (sourceAction) sourceAction.disabled = !selection || locked();
+    if (manuscript.querySelector(".exact-editor")) {
+      selected = selection;
+      selectionHost.hidden = true;
+      return;
+    }
     if (
       selection?.start !== selected?.start ||
       selection?.end !== selected?.end ||
@@ -515,6 +736,16 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
         selected = null;
         selectionHost.hidden = true;
       }
+      return;
+    }
+    if (
+      richWorking() &&
+      selectionHost.firstChild &&
+      selection.start === selected?.start &&
+      selection.end === selected?.end
+    ) {
+      selected = selection;
+      positionSelection();
       return;
     }
     selected = selection;
@@ -536,7 +767,7 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     noteId = null;
     selected = null;
     controller.beginComment(anchor);
-    window.getSelection()?.removeAllRanges();
+    if (!richWorking()) window.getSelection()?.removeAllRanges();
     const field = manuscript.querySelector<HTMLTextAreaElement>(
       ".note-entry textarea",
     );
@@ -631,10 +862,29 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     positionSelection();
   }
   function restoreDraftEditor(anchor: Anchor) {
+    if (richWorking()) {
+      working!.restore(anchor, true);
+      return;
+    }
     const offset = anchor.focusOffset ?? anchor.end,
       block = blocks.find(
         (block) => offset >= block.from && offset <= block.end,
       );
+    if (markdown) {
+      const point = markdown.pointAt(
+        offset,
+        anchor.direction === "backward" ? "start" : "end",
+      );
+      block?.node?.focus({ preventScroll: true });
+      if (point) {
+        const range = document.createRange();
+        range.setStart(...point);
+        range.collapse(true);
+        window.getSelection()?.removeAllRanges();
+        window.getSelection()?.addRange(range);
+      }
+      return;
+    }
     if (block?.node) {
       block.node.focus({ preventScroll: true });
       const range = document.createRange();
@@ -711,8 +961,11 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
           if (block?.wrapper && !reduced()) {
             const spacer = element("div", undefined, "note-collapse");
             spacer.style.setProperty("--collapse-height", `${height}px`);
-            block.wrapper.append(spacer);
-            later(() => spacer.remove(), 550);
+            if (richWorking() && saved) working!.feedback(saved, spacer);
+            else {
+              block.wrapper.append(spacer);
+              later(() => spacer.remove(), 550);
+            }
           }
           const after = block?.node?.getBoundingClientRect().top;
           if (anchorTop !== undefined && after !== undefined)
@@ -876,31 +1129,6 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     peek.append(actions);
     return peek;
   }
-  function plainBlock(block: Block, readOnly: boolean) {
-    const wrapper = element("section", undefined, "block"),
-      prose = element(
-        block.tag,
-        block.text,
-        `prose${block.subtitle ? " subtitle" : ""}`,
-      );
-    prose.contentEditable = readOnly ? "false" : "plaintext-only";
-    prose.setAttribute("aria-readonly", String(readOnly));
-    if (!readOnly) {
-      prose.setAttribute("role", "textbox");
-      prose.setAttribute(
-        "aria-label",
-        block.tag === "h1"
-          ? "文稿标题"
-          : `编辑：${block.text.slice(0, 22) || "空白段落"}`,
-      );
-      prose.setAttribute("aria-multiline", "true");
-      prose.spellcheck = false;
-    }
-    block.node = prose;
-    block.wrapper = wrapper;
-    wrapper.append(prose);
-    return wrapper;
-  }
   function positionReviewMarks() {
     manuscript.style.paddingBottom = "0px";
     for (const windowNode of manuscript.querySelectorAll<HTMLElement>(
@@ -1043,37 +1271,36 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
           : "已选择的正文",
     );
     if (label) lane.append(element("span", label, "review-lane-label"));
-    const fineIds = new Set(
-      blocks.flatMap((block) =>
-        block.runs.filter((run) => run.mark === "equal").map((run) => run.id),
-      ),
-    );
-    for (const block of blocks) {
-      if (!block.runs.some((run) => run.text.trim())) continue;
+    if (blocks.length) {
       const node = element(
-        structural ? block.format.tag : "span",
+        structural ? "div" : "span",
         undefined,
-        `${structural ? "prose " : ""}review-lane-reading${block.format.subtitle ? " subtitle" : ""}`,
+        "review-lane-reading",
       );
-      for (const run of block.runs) {
-        if (run.tag === "text") node.append(document.createTextNode(run.text));
-        else {
-          const mark =
-            !fineIds.has(run.id) && side !== "selected" ? "whole" : run.mark;
-          const fragment = element(
-            mark === "delete" ? "del" : mark === "insert" ? "ins" : "span",
-            run.text,
-            `review-fragment ${mark}-fragment`,
-          );
-          fragment.dataset.reviewRef = run.id;
-          const locate = () => markReview(run.id, true),
-            clear = () => markReview(run.id, false);
-          fragment.addEventListener("pointerenter", locate);
-          fragment.addEventListener("pointerleave", clear);
-          node.append(fragment);
-        }
+      const reading = blocks[0].reading;
+      let renderer = reviewReadings.get(reading);
+      if (!renderer) {
+        renderer = createReviewReading(reading);
+        reviewReadings.set(reading, renderer);
       }
-      lane.append(node);
+      node.append(
+        renderer.extract(
+          Math.min(...blocks.map((block) => block.from)),
+          Math.max(...blocks.map((block) => block.end)),
+          structural,
+        ),
+      );
+      for (const fragment of node.querySelectorAll<HTMLElement>(
+        "[data-review-ref]",
+      )) {
+        fragment.addEventListener("pointerenter", () =>
+          markReview(fragment.dataset.reviewRef, true),
+        );
+        fragment.addEventListener("pointerleave", () =>
+          markReview(fragment.dataset.reviewRef, false),
+        );
+      }
+      if (node.childNodes.length) lane.append(node);
     }
     if (
       side !== "selected" &&
@@ -1193,7 +1420,15 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
       );
       const headingLabel = (blocks: LaneBlock[]) =>
         part.formatChanges.includes("heading")
-          ? ({ h1: " · 一级标题", h2: " · 二级标题", p: " · 正文" }[
+          ? ({
+              h1: " · 一级标题",
+              h2: " · 二级标题",
+              h3: " · 三级标题",
+              h4: " · 四级标题",
+              h5: " · 五级标题",
+              h6: " · 六级标题",
+              p: " · 正文",
+            }[
               blocks.find((block) => block.runs.some((run) => run.text.trim()))
                 ?.format.tag ?? "p"
             ] ?? "")
@@ -1226,15 +1461,14 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
         );
     }
     const visibleChange = (id: string) =>
-      part.tag !== "settled" &&
-      [...part.original, ...part.proposal].some((block) =>
-        block.runs.some(
-          (run) =>
-            run.tag === "edit" &&
-            run.id === id &&
-            run.mark !== "equal" &&
-            run.text.trim(),
+      [
+        ...wrapper.querySelectorAll<HTMLElement>(
+          `[data-review-ref="${CSS.escape(id)}"]`,
         ),
+      ].some(
+        (node) =>
+          node.matches(".insert-fragment,.delete-fragment,.whole-fragment") &&
+          Boolean(node.textContent?.trim()),
       );
     const invisibleComparison =
       part.tag !== "settled" &&
@@ -1243,10 +1477,14 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
           (choice === "pending" || change.id === part.readbackId) &&
           !visibleChange(change.id),
       );
-    if (part.formatChanges.length && invisibleComparison) {
+    if (invisibleComparison) {
       const indicator = element(
         "span",
-        part.formatChanges.includes("heading") ? "标题格式" : "换行与空白",
+        part.formatChanges.includes("heading")
+          ? "标题格式"
+          : part.formatChanges.length
+            ? "换行与空白"
+            : "Markdown 格式",
         "review-format",
       );
       wrapper.append(indicator);
@@ -1326,9 +1564,14 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     );
     prose.setAttribute("aria-readonly", "true");
     for (const part of block.parts) {
-      if (part.tag === "context")
-        prose.append(document.createTextNode(part.visible));
-      else prose.append(reviewWindow(part));
+      if (part.tag === "context") {
+        let renderer = reviewReadings.get(part.reading);
+        if (!renderer) {
+          renderer = createReviewReading(part.reading);
+          reviewReadings.set(part.reading, renderer);
+        }
+        prose.append(renderer.extract(part.from, part.end));
+      } else prose.append(reviewWindow(part));
     }
     const empty = block.parts.every((part) =>
       part.tag === "context"
@@ -1510,7 +1753,24 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
   }
   function renderManuscript() {
     cancelReviewMotion();
+    reviewReadings.clear();
+    const workingBody = state.input?.draft ?? getView().draft;
+    if (
+      !historical() &&
+      !review() &&
+      !editingSource &&
+      !unsupportedSource(workingBody)
+    ) {
+      renderWorking(workingBody);
+      return;
+    }
+    if (working && workingHost) {
+      working.sync(working.source, { kind: "parked" });
+      workingParking.append(workingHost);
+    }
+    editorNotice.hidden = true;
     manuscript.replaceChildren();
+    markdown = null;
     const view = getView(),
       round = review();
     const body = historical()
@@ -1518,6 +1778,7 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
           ?.body ?? "")
       : (state.input?.draft ?? view.draft);
     blocks = parts(body);
+    const tree = round ? null : parseMarkdown(body);
     if (round) {
       const choices = Object.fromEntries(
         round.changes.map((change) => [
@@ -1530,42 +1791,75 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
         { openedId: activeReview },
       ).blocks)
         manuscript.append(renderReviewBlock(block));
-    } else if (!supportsProse(body)) {
-      const description = element(
-        "p",
-        "此文稿包含复杂 Markdown。原文编辑保留全部格式与换行。",
-        "exact-description",
-      );
-      const field = element("textarea", undefined, "exact-editor");
-      field.setAttribute("aria-label", "工作稿正文");
-      field.value = body;
-      field.readOnly = !editable();
-      field.spellcheck = false;
-      field.addEventListener("input", () => {
-        if (!composing) {
+    } else {
+      const sourceView = editingSource && !historical();
+      if (!historical()) {
+        const toolbar = element("div", undefined, "markdown-actions");
+        const toggle = action(
+          sourceView ? "返回文稿" : "编辑原文",
+          sourceView ? "返回文稿" : "编辑原文",
+          () => {
+            editingSource = !editingSource;
+            selected = null;
+            renderKey = "";
+            render();
+          },
+          "markdown-source-toggle",
+        );
+        toggle.disabled = !editable() || Boolean(state.input?.commentDraft);
+        toolbar.append(toggle);
+        if (sourceView) {
+          const annotate = action(
+            "为选中文字写批注",
+            "批注选中文字",
+            () => {
+              if (selected) openSelection(selected);
+            },
+            "markdown-source-toggle",
+          );
+          annotate.dataset.sourceComment = "true";
+          annotate.disabled = true;
+          annotate.addEventListener("pointerdown", (event) =>
+            event.preventDefault(),
+          );
+          toolbar.append(annotate);
+        }
+        manuscript.append(toolbar);
+      }
+      if (!sourceView) {
+        markdown = renderMarkdown(body, tree!);
+        blocks = markdown.blocks;
+        manuscript.append(markdown.root);
+      } else {
+        const field = element("textarea", undefined, "exact-editor");
+        field.setAttribute("aria-label", "工作稿正文");
+        field.value = body;
+        field.readOnly = !editable();
+        field.spellcheck = false;
+        field.addEventListener("input", () => {
+          if (!composing) {
+            const next = editExactText(state.input!.draft, field.value);
+            renderKey = bodyKey(next);
+            controller.editBody(next);
+            field.style.height = `${field.scrollHeight}px`;
+          }
+        });
+        field.addEventListener("select", refreshSelection);
+        field.addEventListener("compositionstart", () => {
+          composing = true;
+        });
+        field.addEventListener("compositionend", () => {
+          composing = false;
           const next = editExactText(state.input!.draft, field.value);
           renderKey = bodyKey(next);
           controller.editBody(next);
-          field.style.height = `${field.scrollHeight}px`;
-        }
-      });
-      field.addEventListener("select", refreshSelection);
-      field.addEventListener("compositionstart", () => {
-        composing = true;
-      });
-      field.addEventListener("compositionend", () => {
-        composing = false;
-        const next = editExactText(state.input!.draft, field.value);
-        renderKey = bodyKey(next);
-        controller.editBody(next);
-      });
-      manuscript.append(description, field);
-      later(() => {
-        field.style.height = `${Math.max(320, field.scrollHeight)}px`;
-      }, 0);
-    } else
-      for (const block of blocks)
-        manuscript.append(plainBlock(block, !editable()));
+        });
+        manuscript.append(field);
+        later(() => {
+          field.style.height = `${Math.max(320, field.scrollHeight)}px`;
+        }, 0);
+      }
+    }
     const note = currentNote();
     if (note && !historical() && !round) {
       const block = blocks.find(
@@ -1585,26 +1879,6 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     }
     paper.classList.toggle("view-history", historical());
     manuscript.setAttribute("aria-busy", String(state.busy > 0));
-    selectionHost.hidden = true;
-    scheduleGeometry();
-  }
-  function saveEditor() {
-    if (composing || !editable() || !state.input) return;
-    const next = blocks
-      .map((block) => block.prefix + (block.node?.innerText ?? block.text))
-      .join("\n\n");
-    if (next === state.input.draft) return;
-    let offset = 0;
-    for (const block of blocks) {
-      block.text = block.node?.innerText ?? block.text;
-      block.raw = block.prefix + block.text;
-      block.from = offset;
-      block.end = offset + block.raw.length;
-      offset = block.end + 2;
-    }
-    renderKey = bodyKey(next);
-    controller.editBody(next);
-    selected = null;
     selectionHost.hidden = true;
     scheduleGeometry();
   }
@@ -1630,6 +1904,7 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
         ? state.input?.comments.find((note) => note.id === noteId)?.instruction
         : null,
       activeReview,
+      editingSource,
       locked: locked(),
     });
   }
@@ -1750,9 +2025,11 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
           state.input?.draftRevision === round.sourceDraftRevision &&
           JSON.stringify(state.input?.comments) ===
             JSON.stringify(round.submittedComments);
-        run(unchanged ? controller.retry() : controller.generate());
+        inputCommand(() =>
+          unchanged ? controller.retry() : controller.generate(),
+        );
       } else showNotice("生成中断，待核对。原执行结束前无法重新生成。");
-    } else run(controller.generate());
+    } else inputCommand(() => controller.generate());
   }
   function captureFieldSelection(field: HTMLTextAreaElement): FieldSelection {
     const { selectionStart, selectionEnd, selectionDirection } = field;
@@ -1898,16 +2175,35 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
       note: noteId,
       selected,
       review: activeReview,
+      sourceSelection:
+        markdown && range
+          ? (() => {
+              const start = markdown.sourcePoint(
+                  range.startContainer,
+                  range.startOffset,
+                  "start",
+                ),
+                end = markdown.sourcePoint(
+                  range.endContainer,
+                  range.endOffset,
+                  "end",
+                );
+              return start === null || end === null ? null : [start, end];
+            })()
+          : null,
     };
   }
   function openHistory() {
     if (historical()) return;
-    bookmark = captureBookmark();
-    noteId = null;
-    selected = null;
-    setReveal("closed");
-    controller.browseVersion(getView().workingBase.version);
-    viewport.focus({ preventScroll: true });
+    inputCommand(() => {
+      workingBookmark = richWorking() ? working!.selection(true) : null;
+      bookmark = captureBookmark();
+      noteId = null;
+      selected = null;
+      setReveal("closed");
+      controller.browseVersion(getView().workingBase.version);
+      viewport.focus({ preventScroll: true });
+    });
   }
   function closeHistory() {
     if (!historical()) return;
@@ -1936,8 +2232,21 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
                   .includes(saved.note ?? focusedNoteId ?? ""),
               ) ?? brand)
             : (node ?? brand);
-      target.focus({ preventScroll: true });
-      if (node) {
+      if (!(richWorking() && working!.nativeRoot?.contains(target)))
+        target.focus({ preventScroll: true });
+      if (richWorking()) {
+        if (
+          !target.closest(".note-entry,.note-peek,.note-node") &&
+          target !== brand
+        )
+          working!.restore(workingBookmark);
+      } else if (markdown && saved.sourceSelection) {
+        const range = markdown.rangeFor(...saved.sourceSelection);
+        if (range) {
+          window.getSelection()?.removeAllRanges();
+          window.getSelection()?.addRange(range);
+        }
+      } else if (node) {
         const range = document.createRange();
         range.setStart(...pointInText(node, saved.start));
         range.setEnd(
@@ -1962,7 +2271,12 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     renderKey = "";
     render();
     window.scrollTo({ top: 0, behavior: "instant" });
-    blocks[0]?.node?.focus();
+    if (richWorking())
+      working!.restore(
+        { start: 0, end: 0, quote: "", focusOffset: 0, direction: "forward" },
+        true,
+      );
+    else blocks[0]?.node?.focus();
   }
   function requestAdopt(version: number) {
     const view = getView(),
@@ -2017,6 +2331,17 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
               : pending
                 ? "result"
                 : "idle";
+    const savedHead = view.versions.at(-1)?.number ?? null;
+    if (
+      confirmedHead !== null &&
+      savedHead !== confirmedHead &&
+      state.savedReceipt === savedHead &&
+      !state.error
+    ) {
+      brand.classList.add("confirmed");
+      later(() => brand.classList.remove("confirmed"), 750);
+    }
+    confirmedHead = savedHead;
     brand.title = view.documentName;
     const badge = id("pending-badge", HTMLElement);
     badge.textContent = String(pending);
@@ -2024,7 +2349,9 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     badge.setAttribute("aria-label", `${pending} 处待选建议`);
     const task =
       view.applyStatus?.phase === "checking"
-        ? "重新核对写入"
+        ? state.busy > 0
+          ? "正在核对写入"
+          : "重新核对写入"
         : round?.phase === "waiting" || round?.phase === "editing"
           ? "停止生成"
           : round?.phase === "review"
@@ -2036,17 +2363,27 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
                 : "按本轮全部批注改稿";
     generateButton.setAttribute("aria-label", task);
     id("generate-label", HTMLElement).textContent = task;
-    id("task-glyph", HTMLElement).textContent =
+    const glyph =
       view.applyStatus?.phase === "checking"
-        ? "↻"
+        ? state.busy > 0
+          ? "checking"
+          : "retry"
         : round?.phase === "waiting" || round?.phase === "editing"
-          ? "■"
+          ? "stop"
           : round?.phase === "review" || round?.phase === "empty"
-            ? "↗"
+            ? "exit"
             : round?.phase === "interrupted"
-              ? "↻"
+              ? "retry"
               : "AI";
+    const taskGlyph = id("task-glyph", HTMLElement);
+    if (taskGlyph.dataset.kind !== glyph) {
+      taskGlyph.dataset.kind = glyph;
+      taskGlyph.replaceChildren(
+        glyph === "AI" ? element("span", "AI") : icon(glyph),
+      );
+    }
     generateButton.disabled =
+      (view.applyStatus?.phase === "checking" && state.busy > 0) ||
       historical() ||
       Boolean(state.input?.commentDraft) ||
       ((!round || round.phase === "interrupted") &&
@@ -2177,10 +2514,18 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
       if (
         event.target instanceof HTMLElement &&
         event.target.closest(".prose") &&
+        !event.target.closest(".note-entry,.note-peek,.note-collapse") &&
         noteId
       ) {
         noteId = null;
-        manuscript.querySelector(".note-peek")?.remove();
+        if (richWorking()) {
+          workingNote = null;
+          working!.sync(working!.source, {
+            kind: "working",
+            editable: editable(),
+            note: null,
+          });
+        } else manuscript.querySelector(".note-peek")?.remove();
         renderKey = bodyKey();
         scheduleGeometry();
       }
@@ -2203,20 +2548,8 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
         event.target.matches(".prose")
       ) {
         composing = false;
-        saveEditor();
+        render();
       }
-    },
-    { signal: abort.signal },
-  );
-  manuscript.addEventListener(
-    "input",
-    (event) => {
-      if (
-        event.target instanceof HTMLElement &&
-        event.target.matches(".prose") &&
-        !(event instanceof InputEvent && event.isComposing)
-      )
-        saveEditor();
     },
     { signal: abort.signal },
   );
@@ -2226,6 +2559,7 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
       if (
         event.target instanceof HTMLElement &&
         event.target.closest(".prose") &&
+        !event.target.closest(".note-entry,.note-peek,.note-collapse") &&
         !editable()
       )
         event.preventDefault();
@@ -2266,10 +2600,11 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
             (round.phase === "interrupted" && round.executionEnded)) &&
           getView().applyStatus?.phase !== "checking"
         )
-          run(controller.generate());
+          inputCommand(() => controller.generate());
       } else if (mod && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        if (!historical() && !saveButton.disabled) run(controller.apply());
+        if (!historical() && !saveButton.disabled)
+          inputCommand(() => controller.apply());
       } else if (mod && event.shiftKey && event.key.toLowerCase() === "h") {
         event.preventDefault();
         if (historical()) closeHistory();
@@ -2351,7 +2686,7 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
     "click",
     () => {
       setReveal("closed");
-      run(controller.apply());
+      inputCommand(() => controller.apply());
     },
     { signal: abort.signal },
   );
@@ -2368,7 +2703,8 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
   id("history-adopt", HTMLButtonElement).addEventListener(
     "click",
     () => {
-      if (state.viewedVersion !== null) requestAdopt(state.viewedVersion);
+      if (state.viewedVersion !== null)
+        inputCommand(() => requestAdopt(state.viewedVersion!));
     },
     { signal: abort.signal },
   );
@@ -2431,6 +2767,10 @@ export function mountEditor(root: HTMLElement, controller: PanelController) {
   const unsubscribe = controller.subscribe(render);
   render();
   return () => {
+    disposed = true;
+    working?.destroy();
+    workingParking.remove();
+    editorNotice.remove();
     unsubscribe();
     cancelReviewMotion();
     abort.abort();

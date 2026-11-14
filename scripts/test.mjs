@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { finished } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,8 @@ import {
 const args = process.argv.slice(2);
 if (args.length > 1 || (args.length === 1 && args[0] !== "browser"))
   throw new Error("Usage: node scripts/test.mjs [browser]");
+const namePattern = process.env.AGORA_TEST_NAME_PATTERN;
+if (namePattern) new RegExp(namePattern);
 const run = await createManagedRun("test");
 let completed = false;
 /** @type {ReturnType<typeof createTestProcessScope> | undefined} */
@@ -36,22 +38,57 @@ try {
   await Promise.all(
     [temp, state, evidence].map((path) => mkdir(path, { recursive: true })),
   );
-  const folders =
-    args[0] === "browser"
-      ? ["tests/browser"]
-      : ["tests", "tests/tooling", "tests/browser"];
-  const files = (
-    await Promise.all(
-      folders.map(async (folder) =>
-        (await readdir(folder))
-          .filter((name) => name.endsWith(".test.mjs"))
-          .sort()
-          .map((name) => join(folder, name)),
-      ),
-    )
-  ).flat();
+  /** @param {string} folder @returns {Promise<string[]>} */
+  async function discover(folder) {
+    const files = [];
+    const entries = await readdir(folder, { withFileTypes: true });
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(folder, entry.name);
+      if (entry.isSymbolicLink())
+        throw new Error(`Test discovery refuses symlink: ${path}`);
+      if (entry.isDirectory()) files.push(...(await discover(path)));
+      else if (entry.isFile() && entry.name.endsWith(".test.mjs"))
+        files.push(path);
+    }
+    return files;
+  }
+  const folder = args[0] === "browser" ? "tests/browser" : "tests";
+  const files = await discover(folder);
+  if (!files.length) throw new Error(`No test files found in ${folder}`);
+  await writeFile(
+    join(run.root, "test-selection.json"),
+    JSON.stringify(
+      { folder, files, namePattern: namePattern ?? null },
+      null,
+      2,
+    ) + "\n",
+  );
+  if (namePattern)
+    console.log(`Focused test pattern: ${JSON.stringify(namePattern)}`);
+  const selectionCounts = join(run.root, "selected-test-counts.jsonl");
+  const selectionReporter = join(run.root, "selection-reporter.mjs");
+  if (namePattern)
+    await writeFile(
+      selectionReporter,
+      "export default async function* (events) {\n" +
+        "  for await (const event of events)\n" +
+        "    if (event.type === 'test:summary' && event.data.file)\n" +
+        "      yield JSON.stringify(event.data.counts) + '\\n';\n" +
+        "}\n",
+    );
   const log = createWriteStream(join(run.root, "test.log"));
-  const child = spawn(process.execPath, ["--test", ...files], {
+  const testArgs = namePattern
+    ? [
+        "--test",
+        `--test-name-pattern=${namePattern}`,
+        "--test-reporter=tap",
+        "--test-reporter-destination=stdout",
+        `--test-reporter=${selectionReporter}`,
+        `--test-reporter-destination=${selectionCounts}`,
+        ...files,
+      ]
+    : ["--test", ...files];
+  const child = spawn(process.execPath, testArgs, {
     stdio: ["ignore", "pipe", "pipe"],
     detached: process.platform !== "win32",
     env: {
@@ -143,8 +180,20 @@ try {
     encoding: "utf8",
   });
   await writeFile(join(run.root, "source-changes.txt"), changes);
+  const selectedTests = namePattern
+    ? (await readFile(selectionCounts, "utf8"))
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
+        .reduce((total, counts) => total + counts.passed + counts.failed, 0)
+    : null;
   const problems = [
     ...(code !== 0 ? [`Test process exited with code ${code}`] : []),
+    ...(namePattern && code === 0 && !selectedTests
+      ? [
+          `No tests matched AGORA_TEST_NAME_PATTERN=${JSON.stringify(namePattern)}`,
+        ]
+      : []),
     ...(processes.leaked.length
       ? [
           `Test process leaked owned child processes: ${processes.leaked.join(", ")}`,

@@ -9,9 +9,9 @@ import {
 } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { test } from "node:test";
-import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createManagedRun } from "../../dev/runtime/src/index.mjs";
+import { waitFor } from "../support/wait.mjs";
 import {
   createTestProcessScope,
   finishTestProcesses,
@@ -127,17 +127,29 @@ test("nested scopes retain outer membership and never own their creator", async 
     })();
   `,
   );
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (
-      await access(witness).then(
-        () => true,
-        () => false,
-      )
-    )
-      break;
-    await delay(25);
-  }
-  const result = JSON.parse(await readFile(witness, "utf8"));
+  const result = await waitFor(
+    async () => {
+      if (child.exitCode !== null || child.signalCode !== null)
+        throw new Error(
+          `Nested scope exited: ${child.signalCode ?? child.exitCode}`,
+        );
+      try {
+        return JSON.parse(await readFile(witness, "utf8"));
+      } catch (error) {
+        if (!(
+          error instanceof Error &&
+          "code" in error &&
+          error.code === "ENOENT"
+        ))
+          throw error;
+        return undefined;
+      }
+    },
+    {
+      description: "nested process cleanup report",
+      diagnostics: () => child.stderr.read()?.toString() ?? "",
+    },
+  );
   ok(result.report.leaked.includes(result.child));
   ok(!result.report.leaked.includes(child.pid));
   equal(result.report.survivors.length, 0);

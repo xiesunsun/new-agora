@@ -2,8 +2,10 @@ import { test } from "node:test";
 import { deepEqual, equal, ok } from "node:assert/strict";
 import { register } from "node:module";
 register("./panel-loader.mjs", import.meta.url);
-const { reviewDocument, parts } =
+const { reviewDocument } =
   await import("../apps/panel/src/editor/review-document.js");
+const { manuscriptBlocks: parts } =
+  await import("../apps/panel/src/editor/markdown-syntax.js");
 const { reviewRuns } = await import("../apps/panel/src/editor/review-runs.js");
 const { orbitLayout } =
   await import("../apps/panel/src/editor/orbit-layout.js");
@@ -54,12 +56,16 @@ test("settled inline reading contains each selected sentence once and readback d
 });
 test("presentation keeps raw block positions and Unicode review runs exact", () => {
   const source = "\uFEFF# 标题\r\n\r\n🙂空白  \r\n";
-  equal(
-    parts(source)
-      .map((block) => block.raw)
-      .join("\n\n"),
-    source,
-  );
+  const blocks = parts(source);
+  let reconstructed = "",
+    cursor = 0;
+  for (const block of blocks) {
+    equal(block.raw, source.slice(block.from, block.end));
+    reconstructed += source.slice(cursor, block.from) + block.raw;
+    cursor = block.end;
+  }
+  reconstructed += source.slice(cursor);
+  equal(reconstructed, source);
   const runs = reviewRuns("🙂原句。", "🙂新句。");
   equal(
     runs

@@ -21,15 +21,19 @@ pnpm check
 | `pnpm typecheck` | TypeScript 严格类型检查 |
 | `pnpm check:repository` | 仓库根目录、运行数据和生成产物的归属 |
 | `pnpm check:architecture` | 生产源码的依赖方向、公开入口、循环与无法解析的导入 |
-| `pnpm test` | 仓库自动化测试 |
-| `pnpm test:browser` | 构建并启动 Agora，用 Chromium 验证文稿编辑器可见、可编辑并加载正确正文 |
+| `pnpm test` | 构建后递归运行 `tests` 下全部 `.test.mjs`，包含浏览器与开发工具回归 |
+| `pnpm test:browser` | 构建后递归运行 `tests/browser`，用真实服务与 Chromium 验证编辑、批注、审阅、保存、历史和文本保真 |
 | `pnpm check:docs` | Markdown 的本地文件与标题链接，调用 `python3 scripts/check-doc-links.py` |
 
 运行 `pnpm dev` 打开 [A01 测试文稿](../tests/README.md#a01)。命令会构建实际面板和服务，并打印预览地址、Markdown 副本和运行目录。要单独构建发布入口，运行 `pnpm build`。
 
 运行 `pnpm mock` 打开已确认的书店示例。运行 `pnpm mock --config /absolute/path/scenario.json` 更换初始文稿、批注、生成结果与延迟。每次使用隔离的测试副本，配置和模拟执行不进入面板。[mock 场景说明](../dev/mock/README.md)给出字段与真实服务入口。
 
-本仓库源码保持严格类型检查。`skipLibCheck` 跳过依赖声明文件的检查，兼容桌面 MCP SDK 声明中省略扩展名的导入。
+本仓库源码保持严格类型检查。根配置按 NodeNext 检查服务、脚本和测试；[面板配置](../apps/panel/tsconfig.json)按 Bundler 检查浏览器源码，与 esbuild 的解析方式一致。`pnpm typecheck` 运行两者。`skipLibCheck` 只跳过依赖声明文件的检查，不抑制本仓库源码错误。
+
+定位单条回归时，可以临时设置 `AGORA_TEST_NAME_PATTERN` 后运行相同测试入口，例如 `AGORA_TEST_NAME_PATTERN='native editor' pnpm test:browser`。runner 记录选择，保留原有源码与进程隔离，并拒绝无效或没有匹配用例的模式。完整交付检查不设置该变量，选定用例通过不能代表全套通过。
+
+新增测试放在 `tests` 所属目录中，以 `.test.mjs` 结尾；runner 拒绝符号链接和空测试集合。夹具关闭、服务启动诊断及有期限的等待接口见[测试辅助](../tests/support/README.md)。验收与自动测试的对应关系见[场景索引](../tests/README.md#覆盖与运行入口)。
 
 ## 在 Codex app 中开发
 

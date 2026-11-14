@@ -33,6 +33,7 @@ type ServiceOptions = {
   runtimeDir: string;
   panelDir: string;
   port: number;
+  resetThreadBinding?: boolean;
 };
 
 const panelAssets = new Map([
@@ -65,7 +66,12 @@ export async function startService(
   try {
     owner.exec("BEGIN EXCLUSIVE");
     db = privateDatabase(join(runtimeDir, "document.sqlite"));
-    const document = new DocumentService(db, originalPath, runtimeDir);
+    const document = new DocumentService(
+      db,
+      originalPath,
+      runtimeDir,
+      options.resetThreadBinding,
+    );
     server = createServer((request, response) => {
       void serve(request, response, {
         document,
